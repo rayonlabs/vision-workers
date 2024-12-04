@@ -5,7 +5,7 @@ Providing Access to Bittensor with Decentralized Subnet Inference at Scale
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[Bittensor](https://bittensor.com/whitepaper) • [Discord](https://discord.gg/dR865yTPaZ) • [Corcel](https://app.corcel.io/studio)
+[Bittensor](https://bittensor.com/whitepaper) • [Discord](https://discord.gg/dR865yTPaZ) • [Corcel](https://app.corcel.io/studio) • [Nineteen](https://nineteen.ai/)
 </div>
 
 ## NOTE:
@@ -32,7 +32,7 @@ Miner workers can operate on both Runpod/VastAI and bare metal machines, althoug
 
 ## For Runpod and Similar Providers
 
-Refer to the [Runpod Setup Guide](https://github.com/namoray/vision/blob/main/docs/mining.md#worker-server-setup) for instructions on starting workers.
+Refer to the [Runpod Setup Guide](https://github.com/namoray/vision/blob/production/docs/mining.md#worker-server-setup) for instructions on starting workers.
 
 ## For Bare Metal Users
 

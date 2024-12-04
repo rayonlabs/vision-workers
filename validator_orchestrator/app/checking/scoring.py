@@ -1,5 +1,3 @@
-# i think i should just be posting to a checking servier to do all of this & return me what the details
-
 from datetime import datetime
 from typing import Callable, Dict
 from typing import Any
@@ -37,7 +35,7 @@ async def score_results(
     if func is None:
         logger.error(f"Could not import function {task_config.checking_function}")
         return models.TaskResult(node_scores=node_scores, timestamp=datetime.now())
-    base_score: float = await func(result, payload, task_config)
+    base_score: float = await func(result, payload, task_config) # TODO : handle errors properly
 
     if base_score is None:
         logger.info(f"Got no base score. Axon scores: {node_scores}")
@@ -45,6 +43,6 @@ async def score_results(
 
     node_scores[result.node_id] = base_score
 
-    logger.info(f"Got Axon scores: {node_scores}")
+    logger.info(f"Got Axon scores: {node_scores}") 
 
     return models.TaskResult(node_scores=node_scores, timestamp=datetime.now())
