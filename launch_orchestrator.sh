@@ -1,8 +1,16 @@
 #!/bin/bash
-ORCHESTRATOR_IMAGE="nineteenai/sn19:orchestrator-latest"
-IMAGE_SERVER_IMAGE="nineteenai/sn19:image_server-latest"
-PORT=6920
-REFRESH_LOCAL_IMAGES=1
+
+if [ ! -f .vali.env ]; then
+    python3 create_config.py --default
+fi
+
+source .vali.env
+
+# Set core default values if not provided by .vali.env
+: ${ORCHESTRATOR_IMAGE:="nineteenai/sn19:orchestrator-latest"}
+: ${IMAGE_SERVER_IMAGE:="nineteenai/sn19:image_server-latest"}
+: ${PORT:=6920}
+: ${REFRESH_LOCAL_IMAGES:=1}
 
 # ./launch_orchestrator.sh --image-server-image nineteenai/sn19:image_server-6.0.0 --orchestrator-image nineteenai/sn19:orchestrator-6.0.0
 
@@ -54,9 +62,8 @@ if [[ -n "$NVIDIA_RUNTIME_FLAG" ]]; then
 fi
 
 if [[ -n "$DEVICE" ]]; then
-  DOCKER_RUN_FLAGS+=" -e CUDA_VISIBLE_DEVICES=$DEVICE \
-                        -e DEVICE=$DEVICE \
-                        --gpus \"device=$DEVICE\""
+  DOCKER_RUN_FLAGS+=" -e DEVICE=$DEVICE \
+                      --gpus \"device=$DEVICE\""
 else
   DOCKER_RUN_FLAGS+=" --gpus all"
 fi
@@ -124,4 +131,4 @@ docker stop llm_server 2>/dev/null || true
 sleep 5
 docker rm -f llm_server 2>/dev/null || true
 
-docker run -d --rm --name $ORCHESTRATOR_CONTAINER_NAME $DOCKER_RUN_FLAGS -e PORT=$PORT -p $PORT:$PORT $ORCHESTRATOR_IMAGE
+docker run -d --rm --name $ORCHESTRATOR_CONTAINER_NAME $DOCKER_RUN_FLAGS -e PORT=$PORT -e DEVICE=$DEVICE -p $PORT:$PORT $ORCHESTRATOR_IMAGE

@@ -34,7 +34,7 @@ docker run --gpus all  -p 6920:6920 corcelio/vision:orchestrator-latest
 NOTE: this will use prod image server & llm server images unless otherwise specified
 ```bash
 docker build -t corcelio/dev:orch-test . -f Dockerfile.orchestrator
-docker run -p 6920:6920 -e PORT=6920 -e CUDA_VISIBLE_DEVICES=0 -e DEVICE=0 --gpus '"device=0"' --runtime=nvidia corcelio/dev:orch-test
+docker run -p 6920:6920 -e PORT=6920 -e DEVICE=0 --gpus '"device=0"' --runtime=nvidia corcelio/dev:orch-test
 ```
 or
 NOTE: this will use prod image server & llm server images unless otherwise specified
@@ -73,7 +73,7 @@ docker kill image-test || true; docker build -t corcelio/dev:image-test . -f Doc
 **Run LLM image**
 
 ```bash
-docker kill llm-test || true; docker build -t corcelio/dev:llm-test . -f Dockerfile.llm_server; docker run --name llm-test -d --rm  -v HF:/app/cache -p 6918:6919 --gpus '"device=1"' --runtime=nvidia -e PORT=6919 -e MODEL=leafspark/Reflection-Llama-3.1-70B-GGUF   -e CUDA_VISIBLE_DEVICES=0 corcelio/dev:llm-test; docker logs -f --tail 50 llm-test
+docker kill llm-test || true; docker build -t corcelio/dev:llm-test . -f Dockerfile.llm_server; docker run --name llm-test -d --rm  -v HF:/app/cache -p 6918:6919 --gpus '"device=1"' --runtime=nvidia -e PORT=6919 -e MODEL=leafspark/Reflection-Llama-3.1-70B-GGUF   corcelio/dev:llm-test; docker logs -f --tail 50 llm-test
 ```
 
 ### Uploading to docker hub
