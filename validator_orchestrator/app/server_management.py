@@ -21,11 +21,15 @@ class ServerManager:
 
         cuda_visible_devices = os.environ.get("DEVICE", None)
         if cuda_visible_devices is not None:
+            logger.info(f"Using gpus : {cuda_visible_devices}")
             gpus = cuda_visible_devices
         else:
+            logger.info(f"DEVICE env var is not defined, using all gpus")
             gpus = "all"
 
         self.docker_run_flags = f'--gpus "device={gpus}" --runtime=nvidia'
+
+        logger.info(f"using docker flags : {self.docker_run_flags}")
 
 
     def _kill_process_on_port(self, port):
