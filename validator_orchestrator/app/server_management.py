@@ -15,21 +15,17 @@ class ServerManager:
     This class manages starting, stopping, and handling of language and image servers.
     """
 
-    cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", None)
+    cuda_visible_devices = os.environ.get("DEVICE", None)
     if cuda_visible_devices is not None:
         gpus = cuda_visible_devices
     else:
         gpus = "all"
 
-    docker_run_flags = f"--gpus {gpus} --runtime=nvidia"
+    docker_run_flags = f'--gpus "device={gpus}" --runtime=nvidia'
 
     def __init__(self):
         self.server_process = None
         self.running_servers = {checking_server_config.name: False for checking_server_config in checking_server_configs}
-
-    def generate_gpu_string(self, num_gpus: int) -> str:
-        gpu_devices = ",".join(str(i) for i in range(num_gpus))
-        return f'--gpus "device={gpu_devices}" --runtime=nvidia'
 
     def _kill_process_on_port(self, port):
         """
@@ -149,11 +145,6 @@ class ServerManager:
         subprocess.Popen(f"docker rm -f {server_config.name}", shell=True).wait()
         for server in self.running_servers:
             self.running_servers[server] = False
-
-        docker_run_flags = self.docker_run_flags
-        if load_model_config is not None and "num_gpus" in load_model_config.keys():
-            num_gpus = load_model_config["num_gpus"]
-            docker_run_flags = self.generate_gpu_string(num_gpus)
 
         extra_docker_flags = ""
         if "extra-docker-flags" in load_model_config.keys():

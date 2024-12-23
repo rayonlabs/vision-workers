@@ -60,9 +60,8 @@ if [[ -n "$NVIDIA_RUNTIME_FLAG" ]]; then
 fi
 
 if [[ -n "$DEVICE" ]]; then
-  DOCKER_RUN_FLAGS+=" -e CUDA_VISIBLE_DEVICES=$DEVICE \
-                        -e DEVICE=$DEVICE \
-                        --gpus \"device=$DEVICE\""
+  DOCKER_RUN_FLAGS+=" -e DEVICE=$DEVICE \
+                      --gpus \"device=$DEVICE\""
 else
   DOCKER_RUN_FLAGS+=" --gpus all"
 fi
@@ -130,4 +129,4 @@ docker stop llm_server 2>/dev/null || true
 sleep 5
 docker rm -f llm_server 2>/dev/null || true
 
-docker run -d --rm --name $ORCHESTRATOR_CONTAINER_NAME $DOCKER_RUN_FLAGS -e PORT=$PORT -p $PORT:$PORT $ORCHESTRATOR_IMAGE
+docker run -d --rm --name $ORCHESTRATOR_CONTAINER_NAME $DOCKER_RUN_FLAGS -e PORT=$PORT -e DEVICE=$DEVICE -p $PORT:$PORT $ORCHESTRATOR_IMAGE
