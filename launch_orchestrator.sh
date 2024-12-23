@@ -1,10 +1,10 @@
 #!/bin/bash
 
-[ ! -f .vali.env ] && python3 create_config.py --default
-
-if [ -f .vali.env ]; then
-    source .vali.env
+if [ ! -f .vali.env ]; then
+    python3 create_config.py --default
 fi
+
+source .vali.env
 
 # Set core default values if not provided by .vali.env
 : ${ORCHESTRATOR_IMAGE:="nineteenai/sn19:orchestrator-latest"}
