@@ -27,7 +27,7 @@ class ServerManager:
             logger.info(f"DEVICE env var is not defined, using all gpus")
             gpus = "all"
 
-        self.docker_run_flags = f'--gpus "device={gpus}" --runtime=nvidia'
+        self.docker_run_flags = f"--gpus '\"device={gpus}\"' --runtime=nvidia"
 
         logger.info(f"using docker flags : {self.docker_run_flags}")
 
