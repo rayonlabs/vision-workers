@@ -15,17 +15,18 @@ class ServerManager:
     This class manages starting, stopping, and handling of language and image servers.
     """
 
-    cuda_visible_devices = os.environ.get("DEVICE", None)
-    if cuda_visible_devices is not None:
-        gpus = cuda_visible_devices
-    else:
-        gpus = "all"
-
-    docker_run_flags = f'--gpus "device={gpus}" --runtime=nvidia'
-
     def __init__(self):
         self.server_process = None
         self.running_servers = {checking_server_config.name: False for checking_server_config in checking_server_configs}
+
+        cuda_visible_devices = os.environ.get("DEVICE", None)
+        if cuda_visible_devices is not None:
+            gpus = cuda_visible_devices
+        else:
+            gpus = "all"
+
+        self.docker_run_flags = f'--gpus "device={gpus}" --runtime=nvidia'
+
 
     def _kill_process_on_port(self, port):
         """
