@@ -164,7 +164,7 @@ class ServerManager:
             + " ".join([f"-v {volume}:{mount_path}" for volume, mount_path in server_config.volumes.items()])
             + " "
             + " ".join([f"-e {key}={val}" for key, val in server_config.env_vars.items()])
-            + f" {docker_run_flags} "
+            + f" {self.docker_run_flags} "
             + f"-p {server_config.external_port}:{server_config.port} "
             + f"--network {server_config.network} "
             + f"{server_config.docker_image} "
