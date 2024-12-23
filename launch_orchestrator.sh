@@ -1,8 +1,14 @@
 #!/bin/bash
-ORCHESTRATOR_IMAGE="nineteenai/sn19:orchestrator-latest"
-IMAGE_SERVER_IMAGE="nineteenai/sn19:image_server-latest"
-PORT=6920
-REFRESH_LOCAL_IMAGES=1
+
+if [ -f .vali.env ]; then
+    source .vali.env
+fi
+
+# Set core default values if not provided by .vali.env
+: ${ORCHESTRATOR_IMAGE:="nineteenai/sn19:orchestrator-latest"}
+: ${IMAGE_SERVER_IMAGE:="nineteenai/sn19:image_server-latest"}
+: ${PORT:=6920}
+: ${REFRESH_LOCAL_IMAGES:=1}
 
 # ./launch_orchestrator.sh --image-server-image nineteenai/sn19:image_server-6.0.0 --orchestrator-image nineteenai/sn19:orchestrator-6.0.0
 
