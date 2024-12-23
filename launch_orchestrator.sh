@@ -1,5 +1,7 @@
 #!/bin/bash
 
+[ ! -f .vali.env ] && python3 create_config.py --default
+
 if [ -f .vali.env ]; then
     source .vali.env
 fi

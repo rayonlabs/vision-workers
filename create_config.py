@@ -1,46 +1,53 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 from typing import Dict, Any
 
-def get_user_input(prompt: str, default: Any = None) -> str:
+def get_user_input(prompt: str, default: Any = None, use_default: bool = False) -> str:
+    if use_default and default is not None:
+        return str(default)
     default_display = f" [{default}]" if default is not None else ""
     response = input(f"{prompt}{default_display}: ").strip()
     if not response and default is not None:
         return str(default)
     return response
 
-def create_config() -> Dict[str, str]:
+def create_config(use_default: bool = False) -> Dict[str, str]:
     config = {}
     
     config['ORCHESTRATOR_IMAGE'] = get_user_input(
         "Enter orchestrator image",
-        "nineteenai/sn19:orchestrator-latest"
+        "nineteenai/sn19:orchestrator-latest",
+        use_default
     )
     
     config['IMAGE_SERVER_IMAGE'] = get_user_input(
         "Enter image server image",
-        "nineteenai/sn19:image_server-latest"
+        "nineteenai/sn19:image_server-latest",
+        use_default
     )
     
     config['PORT'] = get_user_input(
         "Enter port number",
-        "6920"
+        "6920",
+        use_default
     )
     
     refresh = get_user_input(
         "Auto-refresh local images? (1 for yes, 0 for no)",
-        "1"
+        "1",
+        use_default
     )
     if refresh in ('0', '1'):
         config['REFRESH_LOCAL_IMAGES'] = refresh
-    
-    # Optional settings
-    device = get_user_input(
-        "Enter GPU devices (e.g., 0 or 0,1,2) or press Enter to skip"
-    )
-    if device:
-        config['DEVICE'] = device
+
+    if not use_default:
+        device = get_user_input(
+            "Enter GPU devices (e.g., 0 or 0,1,2) or press Enter to skip"
+        )
+        if device:
+            config['DEVICE'] = device
 
     return config
 
@@ -64,18 +71,23 @@ def write_config(config: Dict[str, str], filename: str = ".vali.env") -> None:
                 f.write(f'{key}={value}\n')
 
 def main():
-    print("Press Enter to accept default values or input your own.\n")
+    use_default = "--default" in sys.argv
     
-    if os.path.exists(".vali.env"):
+    if not use_default:
+        print("Press Enter to accept default values or input your own.\n")
+    
+    if os.path.exists(".vali.env") and not use_default:
         response = input(".vali.env already exists. Overwrite? (y/N): ").lower()
         if response != 'y':
             print("Configuration creation cancelled.")
             return
     
-    config = create_config()
+    config = create_config(use_default)
     write_config(config)
-    print("\nConfiguration file .vali.env has been created successfully!")
-    print("You can manually edit this file later if needed.")
+    
+    if not use_default:
+        print("\nConfiguration file .vali.env has been created successfully!")
+        print("You can manually edit this file later if needed.")
 
 if __name__ == "__main__":
     main()
