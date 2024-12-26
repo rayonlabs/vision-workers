@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import base_model
 import inference
 import traceback
@@ -6,6 +6,7 @@ from typing import Callable
 from functools import wraps
 from model_manager import model_manager
 from starlette.responses import PlainTextResponse
+from loguru import logger
 
 app = FastAPI()
 
@@ -17,8 +18,8 @@ def handle_request_errors(func: Callable):
             return await func(*args, **kwargs)
         except Exception as e:
             tb_str = traceback.format_exc()
-            return {"error": str(e), "traceback": tb_str}
-
+            logger.error(f"Error in {func.__name__}: {str(e)}\n{tb_str}")
+            raise HTTPException(status_code=500, detail={"error": str(e), "traceback": tb_str})
     return wrapper
 
 
