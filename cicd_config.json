@@ -2,8 +2,8 @@
     "runpod-workflow": true,
     "gcp-workflow": true,
     "runpod-gpu-type": "NVIDIA A100 80GB PCIe",
-    "gcp-gpu-name": "a100-cuda118",
-    "gcp-gpu-zone": "us-central1-b",
+    "gcp-gpu-name": "tau-workers-cicd",
+    "gcp-gpu-zone": "us-central1-f",
     "orchestrator-port": "6920",
     "llm-server-port": "6919",
     "image-server-port": "6919"

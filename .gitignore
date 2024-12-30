@@ -5,9 +5,7 @@ db/*.sql
 tmp*
 
 
-*.ipynb
-.gcloudignore
-charlie_test.py
+
 dev_testing.py
 temp/
 

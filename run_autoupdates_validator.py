@@ -35,14 +35,14 @@ def run_auto_updater():
 
                 print("Running the autoupdate steps...")
                 os.system("./autoupdates_validator_steps.sh")
-                time.sleep(20)
+                time.sleep(5)
 
                 print("Finished running the autoupdate steps! Ready to go 😎")
 
         else:
             print("Repo is up-to-date.")
 
-        time.sleep(60)
+        time.sleep(3)
 
 
 if __name__ == "__main__":

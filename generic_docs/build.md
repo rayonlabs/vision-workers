@@ -45,7 +45,6 @@ docker kill orchestrator || true; docker build -t corcelio/dev:orch-test . -f Do
 **Build all**
 ```bash
 docker build -t corcelio/dev:orch-test . -f Dockerfile.orchestrator
-docker build -t corcelio/dev:llm-test . -f Dockerfile.llm_server
 docker build -t corcelio/dev:image-test . -f Dockerfile.image_server
 ```
 
@@ -53,12 +52,12 @@ docker build -t corcelio/dev:image-test . -f Dockerfile.image_server
 
 
 ```bash
-./launch_orchestrator.sh --orchestrator-image corcelio/dev:orch-test --llm-image corcelio/dev:llm-test --image-server-image corcelio/dev:image-test --dont-refresh-local-images
+./launch_orchestrator.sh --orchestrator-image corcelio/dev:orch-test  --image-server-image corcelio/dev:image-test --dont-refresh-local-images
 ```
 
 ** Full command **
 ```bash
-docker build -t corcelio/dev:orch-test . -f Dockerfile.orchestrator && docker build -t corcelio/dev:llm-test . -f Dockerfile.llm_server && docker build -t corcelio/dev:image-test . -f Dockerfile.image_server && ./launch_orchestrator.sh --orchestrator-image corcelio/dev:orch-test --llm-image corcelio/dev:llm-test --image-server-image corcelio/dev:image-test --dont-refresh-local-images && docker logs --tail 50 -f orchestrator
+docker build -t corcelio/dev:orch-test . -f Dockerfile.orchestrator  && docker build -t corcelio/dev:image-test . -f Dockerfile.image_server && ./launch_orchestrator.sh --orchestrator-image corcelio/dev:orch-test --image-server-image corcelio/dev:image-test --dont-refresh-local-images && docker logs --tail 50 -f orchestrator
 ```
 
 

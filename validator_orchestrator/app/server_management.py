@@ -28,7 +28,7 @@ class ServerManager:
         self.running_servers = {checking_server_config.name: False for checking_server_config in checking_server_configs}
 
     def generate_gpu_string(self, num_gpus: int) -> str:
-        gpu_devices = ','.join(str(i) for i in range(num_gpus))
+        gpu_devices = ",".join(str(i) for i in range(num_gpus))
         return f'--gpus "device={gpu_devices}" --runtime=nvidia'
 
     def _kill_process_on_port(self, port):
@@ -74,6 +74,11 @@ class ServerManager:
                     response = await client.get(f"http://{server_name}:{port}")
                     server_is_healthy = response.status_code == 200
                     if not server_is_healthy:
+                        # Some servers don't have a health endpoint, so we try to ping the root first
+                        # then fall back to this (llm has health, image does not)
+                        response = await client.get(f"http://{server_name}:{port}/health")
+                        server_is_healthy = response.status_code == 200
+
                         await asyncio.sleep(sleep_time)
                     else:
                         logger.info(f"Server {port} is healthy!")
@@ -102,12 +107,11 @@ class ServerManager:
         except httpx.HTTPError:
             raise Exception("Timeout when loading model :(")
 
-    async def start_server(self, server_type: ServerType, load_model_config : dict | None ):
+    async def start_server(self, server_type: ServerType, load_model_config: dict | None):
         """
         Start a server with the given name.
         """
         server_config = get_checking_server_config(server_type)
-
 
         if server_config is None:
             logger.error(f"Server {server_type.value} not found in the server config")
@@ -124,23 +128,36 @@ class ServerManager:
         # we want is not running
         self.running_servers[server_config.name] = desired_server_is_online
 
-        logger.debug(f"Desired server: {server_config.name}. Is running: {desired_server_is_online}.")
+        logger.info(f"Desired server: {server_config.name}. Is running: {desired_server_is_online}.")
 
-        if not desired_server_is_online:
-            # Check no other server is running on the same port
-            logger.info(f"Running servers: {self.running_servers}. Killing anything on port {server_config.port}...")
-            self._kill_process_on_port(server_config.port)
-            subprocess.Popen(f"docker rm -f {server_config.name}", shell=True).wait()
-            for server in self.running_servers:
-                self.running_servers[server] = False
-        else:
-            logger.info(f"Running servers: {self.running_servers}. This is correct, so doing nothing...")
-            return
-        
+        if desired_server_is_online:
+            if server_config.name == ServerType.LLM.value:
+                correct_model_is_running = await self._check_correct_model_is_running(
+                    server_name=server_config.name,
+                    port=server_config.port,
+                    model_name=load_model_config["model"],
+                )
+                if correct_model_is_running:
+                    return
+            # no need for image tasks
+            else:
+                return
+
+        # Check no other server is running on the same port
+        logger.info(f"Running servers: {self.running_servers}. Killing anything on port {server_config.port}...")
+        self._kill_process_on_port(server_config.port)
+        subprocess.Popen(f"docker rm -f {server_config.name}", shell=True).wait()
+        for server in self.running_servers:
+            self.running_servers[server] = False
+
         docker_run_flags = self.docker_run_flags
         if load_model_config is not None and "num_gpus" in load_model_config.keys():
             num_gpus = load_model_config["num_gpus"]
             docker_run_flags = self.generate_gpu_string(num_gpus)
+
+        extra_docker_flags = ""
+        if "extra-docker-flags" in load_model_config.keys():
+            extra_docker_flags = load_model_config["extra-docker-flags"]
 
         sleep(2)
 
@@ -149,15 +166,19 @@ class ServerManager:
         command = (
             f"docker run -d --rm --shm-size={shared_vol_size} --name {server_config.name} "
             + " ".join([f"-v {volume}:{mount_path}" for volume, mount_path in server_config.volumes.items()])
+            + " "
+            + " ".join([f"-e {key}={val}" for key, val in server_config.env_vars.items()])
             + f" {docker_run_flags} "
-            + f"-p {server_config.port}:{server_config.port} "
+            + f"-p {server_config.external_port}:{server_config.port} "
             + f"--network {server_config.network} "
-            + f"{server_config.docker_image}"
+            + f"{server_config.docker_image} "
         )
+        if extra_docker_flags:
+            command += f" {extra_docker_flags}"
 
         logger.info(f"Starting server: {server_config.name} 🦄")
         logger.debug(f"docker run cmd : {command}")
-        
+
         self.server_process = subprocess.Popen(command, shell=True)
 
         server_is_up = await self.is_server_healthy(
@@ -173,7 +194,6 @@ class ServerManager:
         """
         Stop the currently running server.
         """
-        logger.info(f"Here!")
         for server_name, is_running in self.running_servers.items():
             if is_running:
                 logger.info(f"Stopping the running server container {server_name} 😈")
@@ -207,3 +227,16 @@ class ServerManager:
             return container_name in result.stdout.split()
         except subprocess.CalledProcessError:
             return False
+
+    @staticmethod
+    async def _check_correct_model_is_running(server_name: str, port: int, model_name: str):
+        async with httpx.AsyncClient(timeout=5) as client:
+            response = await client.get(f"http://{server_name}:{port}/v1/models")
+            if response.status_code != 200:
+                logger.error(f"Server {server_name} is running, but /v1/models returned {response.status_code}???")
+                logger.exception(response.text)
+                return False
+            model_loaded = response.json()["data"][0]["id"]
+            correct_model_is_running = model_loaded == model_name
+            logger.info(f"Server {server_name} is running. Model is correct: {correct_model_is_running}")
+            return correct_model_is_running

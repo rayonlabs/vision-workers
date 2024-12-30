@@ -1,7 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from typing import Dict
 from uuid import uuid4
-import os
 from app.core import models
 from app.checking import scoring
 from app import server_management
@@ -11,6 +10,7 @@ from loguru import logger
 import traceback
 from datetime import datetime
 from app.checking.task_manager import task_manager
+from app.settings import settings
 import asyncio
 
 router = APIRouter(
@@ -20,6 +20,36 @@ router = APIRouter(
 )
 
 global_async_lock = asyncio.Lock()
+
+
+def _get_llm_server_docker_flags(task_config: models.OrchestratorServerConfig) -> str:
+    if task_config.server_needed != models.ServerType.LLM:
+        logger.info("Server needed is not LLM, so no docker flags needed")
+        return ""
+
+    load_model_config = task_config.load_model_config
+    dtype = "float16" if load_model_config.get("half_precision", True) else "auto"
+
+    flags = ""
+
+    flags += f" --model {load_model_config['model']}"
+    flags += f" --tokenizer {load_model_config['tokenizer']}"
+    flags += f" --dtype {dtype}"
+    flags += f" --max_model_len {load_model_config.get('max_model_len', 8000)}"
+    flags += f" --gpu_memory_utilization {load_model_config.get('gpu_memory_utilization', 0.7)}"
+    flags += f" --tensor-parallel-size {load_model_config.get('tensor_parallel_size', 1)}"
+    flags += f" --num-scheduler-steps {load_model_config.get('num_scheduler_steps', 1)}"
+    flags += " --port 6919 --enable-chunked-prefill"
+
+    
+    if load_model_config.get("revision", None):
+        flags += f" --revision {load_model_config['revision']}"
+
+    if load_model_config.get('half_precision', True):
+        flags += " --dtype half"
+
+
+    return flags
 
 
 @router.get("/", response_model=Dict[str, str])
@@ -60,13 +90,18 @@ async def process_check_result(
             logger.info(f"Server needed: {server_needed}")
 
             load_model_config = task_config.load_model_config
+
+            flags = _get_llm_server_docker_flags(task_config)
+            load_model_config["extra-docker-flags"] = flags
             await server_manager.start_server(server_needed, load_model_config)
 
             if load_model_config is not None:
                 # TODO: Why is this needed? Slows down checking *alot*
                 # if task_manager.last_task_type != task_config.task:
                 #     load_model_config_dumped["force_reload"] = True
-                await server_manager.load_model(load_model_config, server_name=server_needed.value)
+                if server_needed != models.ServerType.LLM:
+                    # TODO: I'm pretty sure no one uses this any more lol
+                    await server_manager.load_model(load_model_config, server_name=server_needed.value)
 
             task_manager.last_task_type = task_config.task
 
@@ -111,3 +146,10 @@ async def check_task(task_id: str) -> models.CheckTaskResponse:
 @router.get("/all-task-status")
 async def task_statuses() -> models.AllTaskStatusResponse:
     return models.AllTaskStatusResponse(tasks=task_manager.task_status)
+
+
+@router.get("/version")
+async def get_version() -> dict:
+    return {
+        "version": settings.version
+    }

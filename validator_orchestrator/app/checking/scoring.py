@@ -14,7 +14,7 @@ def _import_function(function_name: str) -> Callable | None:
         module = importlib.import_module(module_name)
         return getattr(module, function_name)
     except (ImportError, AttributeError) as e:
-        print(f"Error importing function {function_name}: {e}")
+        logger.exception(f"Error importing function {function_name}")
         return None
 
 
@@ -33,7 +33,7 @@ async def score_results(
     logger.info("Checking scores with server...")
     func = _import_function(task_config.checking_function)
     if func is None:
-        logger.error(f"Could not import function {task_config.checking_function}")
+        logger.exception(f"Could not import function {task_config.checking_function}")
         return models.TaskResult(node_scores=node_scores, timestamp=datetime.now())
     base_score: float = await func(result, payload, task_config) # TODO : handle errors properly
 

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, List, Optional, Any, Union, Callable, Coroutine
+from typing import Dict, List, Optional, Any, Union
 from enum import Enum
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -8,7 +8,7 @@ AxonScores = Dict[int, float]
 
 
 class QueryResult(BaseModel):
-    formatted_response: dict[str, Any] |  list[dict[str, Any]] | None
+    formatted_response: dict[str, Any] | list[dict[str, Any]] | None
     node_id: Optional[int]
     response_time: Optional[float]
 
@@ -45,9 +45,10 @@ class OrchestratorServerConfig(BaseModel):
                 "half_precision": True,
                 "tokenizer": "tau-vision/llama-tokenizer-fix",
                 "max_model_len": 16000,
-                "gpu_utilization": 0.6,
+                "gpu_memory_utilization": 0.6,
+                "eos_token_id": 128009
             },
-            None
+            None,
         ]
     )
     checking_function: str = Field(examples=["check_text_result", "check_image_result"])
@@ -67,7 +68,6 @@ class Message(BaseModel):
 
 
 class MessageResponse(BaseModel):
-    role: str
     content: str
     logprob: float
 
@@ -81,7 +81,14 @@ class ChatRequestModel(BaseModel):
     number_of_logprobs: int
     starting_assistant_message: bool
 
-
+class CompletionRequestModel(BaseModel):
+    prompt: str
+    seed: int
+    temperature: float
+    max_tokens: int
+    top_k: int
+    number_of_logprobs: int
+    
 class MinerChatResponse(BaseModel):
     text: str
     logprob: float
@@ -131,8 +138,20 @@ class Logprob(BaseModel):
 
 
 class ValidatorCheckingResponse(BaseModel):
-    text: str
-    logprobs: List[Logprob]
+    choices: List[ValidatorCheckingResponseBody]
+
+
+class ValidatorCheckingResponseBody(BaseModel):
+    delta: DeltaContent
+    logprobs: LogprobContent
+
+
+class DeltaContent(BaseModel):
+    content: str
+
+
+class LogprobContent(BaseModel):
+    content: List[Logprob]
 
 
 class CheckResultResponse(BaseModel):
