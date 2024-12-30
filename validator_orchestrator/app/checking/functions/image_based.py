@@ -17,6 +17,14 @@ def _get_image_similarity(
     expected_image_response: utility_models.ImageResponseBody,
     images_are_same_classifier: xgb.XGBClassifier,
 ):
+    
+    clip_embedding_imgb64 = _query_endpoint_clip_embeddings({"image_b64s": [image_response_body.image_b64]})[0]
+    clip_embedding_similiarity_internal = checking_utils.get_clip_embedding_similarity(clip_embedding_imgb64, image_response_body.clip_embeddings)
+
+    # if the miner response has mismatches base64 image and CLIP embeddings, assign score of 0
+    if clip_embedding_similiarity_internal < 0.98:
+        return 0
+
     clip_embedding_similiarity = checking_utils.get_clip_embedding_similarity(image_response_body.clip_embeddings, expected_image_response.clip_embeddings)
     hash_distances = checking_utils.get_hash_distances(image_response_body.image_hashes, expected_image_response.image_hashes)
 
@@ -38,6 +46,13 @@ async def _query_endpoint_for_image_response(endpoint: str, data: Dict[str, Any]
         logger.info(response.status_code)
         return utility_models.ImageResponseBody(**response.json())
 
+async def _query_endpoint_clip_embeddings(data: Dict[str, Any]) -> utility_models.ClipEmbeddingsResponse:
+    url = f"http://{models.ServerType.IMAGE.value}:{AI_SERVER_PORT}" + "/clip-embeddings"
+    async with httpx.AsyncClient(timeout=60 * 2) as client:
+        logger.info(f"Querying : {url}")
+        response = await client.post(url, json=data)
+        logger.info(response.status_code)
+        return utility_models.ClipEmbeddingsResponse(**response.json())
 
 async def check_image_result(result: models.QueryResult, payload: dict, task_config: models.OrchestratorServerConfig) -> Union[float, None]:
     image_response_body = utility_models.ImageResponseBody(**result.formatted_response)
