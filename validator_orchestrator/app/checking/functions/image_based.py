@@ -12,13 +12,14 @@ images_are_same_classifier = xgb.XGBClassifier()
 images_are_same_classifier.load_model("image_similarity_xgb_model.json")
 
 
-def _get_image_similarity(
+async def _get_image_similarity(
     image_response_body: utility_models.ImageResponseBody,
     expected_image_response: utility_models.ImageResponseBody,
     images_are_same_classifier: xgb.XGBClassifier,
 ):
     
-    clip_embedding_imgb64 = _query_endpoint_clip_embeddings({"image_b64s": [image_response_body.image_b64]})[0]
+    clip_embedding_imgb64 = await _query_endpoint_clip_embeddings({"image_b64s": [image_response_body.image_b64]})
+    clip_embedding_imgb64 = clip_embedding_imgb64[0]
     clip_embedding_similiarity_internal = checking_utils.get_clip_embedding_similarity(clip_embedding_imgb64, image_response_body.clip_embeddings)
 
     # if the miner response has mismatches base64 image and CLIP embeddings, assign score of 0
@@ -71,7 +72,7 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
         return 0
 
     else:
-        return _get_image_similarity(
+        return await _get_image_similarity(
             image_response_body,
             expected_image_response,
             images_are_same_classifier,
