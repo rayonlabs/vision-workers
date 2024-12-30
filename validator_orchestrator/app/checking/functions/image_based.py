@@ -19,7 +19,7 @@ async def _get_image_similarity(
 ):
     
     clip_embedding_imgb64 = await _query_endpoint_clip_embeddings({"image_b64s": [image_response_body.image_b64]})
-    clip_embedding_imgb64 = clip_embedding_imgb64[0]
+    clip_embedding_imgb64 = clip_embedding_imgb64.clip_embeddings[0]
     clip_embedding_similiarity_internal = checking_utils.get_clip_embedding_similarity(clip_embedding_imgb64, image_response_body.clip_embeddings)
 
     # if the miner response has mismatches base64 image and CLIP embeddings, assign score of 0
