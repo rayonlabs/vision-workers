@@ -1,5 +1,5 @@
 from app.core import models
-from typing import Dict, Any, Union
+from typing import Dict, Any, Union, Tuple
 import httpx
 from app.core import utility_models
 from app.checking import utils as checking_utils
@@ -41,14 +41,19 @@ async def _get_image_similarity(
 
     return score**2
 
-
-async def _query_endpoint_for_image_response(endpoint: str, data: Dict[str, Any], server_name: str) -> utility_models.ImageResponseBody:
+async def query_endpoint_with_status(endpoint: str, data: Dict[str, Any], server_name: str) -> Tuple[utility_models.ImageResponseBody | None, int]:
     url = f"http://{server_name}:{AI_SERVER_PORT}" + "/" + endpoint.lstrip("/")
     async with httpx.AsyncClient(timeout=60 * 2) as client:
         logger.info(f"Querying : {url}")
-        response = await client.post(url, json=data)
-        logger.info(response.status_code)
-        return utility_models.ImageResponseBody(**response.json())
+        try:
+            response = await client.post(url, json=data)
+            logger.info(response.status_code)
+            if response.status_code >= 400:
+                return None, response.status_code
+            return utility_models.ImageResponseBody(**response.json()), response.status_code
+        except httpx.HTTPError as e:
+            status = getattr(e, 'response', None) and e.response.status_code or 500
+            return None, status
 
 async def _query_endpoint_clip_embeddings(data: Dict[str, Any]) -> utility_models.ClipEmbeddingsResponse:
     url = f"http://{models.ServerType.IMAGE.value}:{AI_SERVER_PORT}" + "/clip-embeddings"
@@ -59,13 +64,23 @@ async def _query_endpoint_clip_embeddings(data: Dict[str, Any]) -> utility_model
         return utility_models.ClipEmbeddingsResponse(**response.json())
 
 async def check_image_result(result: models.QueryResult, payload: dict, task_config: models.OrchestratorServerConfig) -> Union[float, None]:
+
+    # checking a fail
+    if result.formatted_response is None:
+        miner_status_code = result.status_code
+        _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload, task_config.server_needed.value)
+        if vali_status_code == miner_status_code:
+            return 1
+        else:
+            return 0
+
     image_response_body = utility_models.ImageResponseBody(**result.formatted_response)
 
     if image_response_body.image_b64 is None and image_response_body.clip_embeddings is None and image_response_body.image_hashes is None and image_response_body.is_nsfw is None:
         logger.error(f"For some reason Everything is none! {image_response_body}")
-        return 0
+        return 0.5
 
-    expected_image_response = await _query_endpoint_for_image_response(task_config.endpoint, payload, task_config.server_needed.value)
+    expected_image_response, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload, task_config.server_needed.value)
 
     if expected_image_response.clip_embeddings is None:
         logger.error(f"For some reason Everything is none! {expected_image_response}")
