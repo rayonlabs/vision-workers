@@ -78,7 +78,7 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
 
     if image_response_body.image_b64 is None and image_response_body.clip_embeddings is None and image_response_body.image_hashes is None and image_response_body.is_nsfw is None:
         logger.error(f"For some reason Everything is none! {image_response_body}")
-        return 0.5
+        return 0
 
     expected_image_response, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload, task_config.server_needed.value)
 
