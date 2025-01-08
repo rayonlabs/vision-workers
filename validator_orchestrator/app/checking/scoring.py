@@ -26,10 +26,11 @@ async def score_results(
 
     node_scores: Dict[int, float] = {}
     func = _import_function(task_config.checking_function)
-    
+
     if result.formatted_response is None:
         logger.info(f"Got no formatted response. Checking if we get the same fail with the same status code")
         base_score: float = await func(result, payload, task_config) # TODO : handle errors properly
+        node_scores[result.node_id] = base_score
         return models.TaskResult(node_scores=node_scores, timestamp=datetime.now())
 
     logger.info("Checking scores with server...")
