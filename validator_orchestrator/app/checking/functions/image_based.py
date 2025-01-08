@@ -69,7 +69,8 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
     if result.formatted_response is None:
         miner_status_code = result.status_code
         _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload, task_config.server_needed.value)
-        if vali_status_code == miner_status_code:
+        logger.info(f"miner status code: {miner_status_code} - vali status code : {vali_status_code}")
+        if str(vali_status_code) == str(miner_status_code):
             return 1
         else:
             return 0
