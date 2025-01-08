@@ -1,11 +1,11 @@
 from app.core import models
-from typing import Union
 import json
 import random
 from loguru import logger
 import httpx
 from typing import List
 import math
+from typing import Dict, Any, Tuple, Union
 
 
 PROMPT_KEY = "prompt"
@@ -104,6 +104,38 @@ async def make_api_call(
         response = await client.post(endpoint, json=payload)
         return response.json()
 
+async def query_endpoint_with_status(
+    endpoint: str,
+    data: Dict[str, Any],
+    server_name: str,
+    base_url: str = "http://llm_server:6919"
+) -> Tuple[Union[Dict[str, Any], None], int]:
+    url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+    
+    async with httpx.AsyncClient(timeout=20) as client:
+        logger.info(f"Querying: {url}")
+        try:
+            response = await client.post(url, json=data)
+            logger.info(f"Status code: {response.status_code}")
+            
+            if response.status_code >= 400:
+                return None, response.status_code
+                
+            try:
+                response_data = response.json()
+                if isinstance(response_data, str):
+                    response_data = json.loads(response_data)
+                return response_data, response.status_code
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"Error decoding JSON response: {e}")
+                return None, response.status_code
+                
+        except httpx.HTTPError as e:
+            status = getattr(e, 'response', None)
+            status_code = status.status_code if status else 500
+            logger.error(f"HTTP error occurred: {e}")
+            return None, status_code
 
 async def calculate_distance_for_token(
     task_config: models.OrchestratorServerConfig,
@@ -159,6 +191,16 @@ async def calculate_distance_for_token(
 
 
 async def check_text_result(result: models.QueryResult, payload: dict, task_config: models.OrchestratorServerConfig) -> Union[float, None]:
+    # check fail
+    if result.formatted_response is None:
+        miner_status_code = result.status_code
+        _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload, task_config.server_needed.value)
+        logger.info(f"miner status code: {miner_status_code} - vali status code : {vali_status_code}")
+        if str(vali_status_code) == str(miner_status_code):
+            return 1
+        else:
+            return 0
+    
     formatted_response = json.loads(result.formatted_response) if isinstance(result.formatted_response, str) else result.formatted_response
     eos_token_id = task_config.load_model_config.get("eos_token_id", 128009)
 
