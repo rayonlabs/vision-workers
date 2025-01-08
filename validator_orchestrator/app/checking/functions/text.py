@@ -107,7 +107,6 @@ async def make_api_call(
 async def query_endpoint_with_status(
     endpoint: str,
     data: Dict[str, Any],
-    server_name: str,
     base_url: str = "http://llm_server:6919"
 ) -> Tuple[Union[Dict[str, Any], None], int]:
     url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
@@ -194,7 +193,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     # check fail
     if result.formatted_response is None:
         miner_status_code = result.status_code
-        _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload, task_config.server_needed.value)
+        _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
         logger.info(f"miner status code: {miner_status_code} - vali status code : {vali_status_code}")
         if str(vali_status_code) == str(miner_status_code):
             return 1
