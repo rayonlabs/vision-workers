@@ -8,9 +8,15 @@ AxonScores = Dict[int, float]
 
 
 class QueryResult(BaseModel):
-    formatted_response: dict[str, Any] | list[dict[str, Any]] | None
+    formatted_response: Any
     node_id: Optional[int]
+    node_hotkey: Optional[str]
     response_time: Optional[float]
+    stream_time: Optional[float]
+    task: str
+    status_code: Optional[int]
+    success: bool
+    created_at: datetime = Field(default_factory=datetime.now)
 
 
 class ChatTokens(BaseModel):

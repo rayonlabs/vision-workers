@@ -44,8 +44,11 @@ async def avatar_infer(
     infer_props: base_model.AvatarBase,
 ) -> base_model.ImageResponseBody:
     payload = payload_modifier.modify_avatar(infer_props)
-    image = api_gate.generate(payload)[0]
-    return await misc.take_image_and_return_formatted_response_body(image)
+    images = api_gate.generate(payload)
+    if not images:
+        raise Exception("No face detected in reference image")
+
+    return await misc.take_image_and_return_formatted_response_body(images[0])
 
 
 async def inpainting_infer(
