@@ -23,7 +23,7 @@ async def _get_image_similarity(
         clip_embedding_similiarity_internal = checking_utils.get_clip_embedding_similarity(clip_embedding_imgb64, image_response_body.clip_embeddings)
 
         # if the miner response has mismatches base64 image and CLIP embeddings, assign score of 0
-        if clip_embedding_similiarity_internal < 0.98:
+        if clip_embedding_similiarity_internal < 0.96:
             return 0
     except:
         logger.error("Failed to query CLIP embeddings with miner's imageb64")
