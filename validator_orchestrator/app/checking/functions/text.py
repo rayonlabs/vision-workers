@@ -297,7 +297,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         indices_to_check = [0]
     else:
         # Always check first & last
-        indices_to_check = [0, len(messages) - 1] + failed_tokens_idx
+        indices_to_check = [0, len(messages) - 1]
 
         number_of_additional_indices_to_check = min(5 - len(indices_to_check), len(messages) - 2) 
         additional_indices_to_check = random.sample(
