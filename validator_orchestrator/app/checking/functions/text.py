@@ -305,7 +305,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         if len(failed_tokens_idx)>0:
             indices_to_check += failed_tokens_idx[:3]
 
-        remaining_indexes = list(set(range(0, len(messages))) - set(indices_to_check))
+        remaining_indexes = list(set(list(set(range(0, len(messages))) - set(indices_to_check))))
 
         number_of_additional_indices_to_check = min(5 - len(indices_to_check), len(messages) - 2) 
         additional_indices_to_check = random.sample(
@@ -332,7 +332,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         llm_request = models.ChatRequestModel(**payload)
         llm_request.max_tokens = 1
 
-    for index in indices_to_check:
+    for i, index in enumerate(indices_to_check):
         if checks >= 5:
             break
 
@@ -341,7 +341,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
             llm_request.prompt += text_to_inject_for_checking
             starting_assistant_message = False
         else:
-            starting_assistant_message = index == 0
+            starting_assistant_message = i == 0
             if index > 0:
                 text_to_inject_into_assistant_message = "".join([i.content for i in messages[:index]])
                 llm_request.messages.append(
