@@ -254,8 +254,11 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     failed_tokens_idx = []
     failed_tokens_details = []
 
-    logger.info(f"all_tokens[num_input_tokens:4] : \n{all_tokens[num_input_tokens:num_input_tokens+4]}")
-    logger.info(f"messages[num_input_tokens:4] : \n{messages[num_input_tokens:num_input_tokens+4]}")
+    logger.info(f"miner response : \n{messages}")
+
+    logger.info(f"all_tokens : \n{all_tokens}")
+
+    logger.info(f"prompt_logprobs : \n{prompt_logprobs}")
 
     for idx, response_token, logprobs in zip(range(len(all_tokens[num_input_tokens:])), all_tokens[num_input_tokens:], prompt_logprobs):
         # Just a helper for nicer printing
