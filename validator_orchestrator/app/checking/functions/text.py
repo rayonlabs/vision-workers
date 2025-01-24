@@ -238,6 +238,8 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         "add_special_tokens": False
     }
 
+    logger.info(f"first completion request:\n{completions_payload}")
+
     try:
         result = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
     except (httpx.RequestError, json.JSONDecodeError) as e:
