@@ -141,8 +141,6 @@ async def calculate_distance_for_token(
         if 'deepseek-r1' in task_config.load_model_config['model'].lower():
             prompt = await _process_think_tags_deepseek(prompt, messages)
             
-        logger.info(f"got messages: {messages}")
-        logger.info(f"transformed to prompt: {prompt}")
     elif isinstance(llm_request, models.CompletionRequestModel):
         prompt = llm_request.prompt
 
@@ -165,9 +163,6 @@ async def calculate_distance_for_token(
     except httpx.RequestError as e:
         logger.error(f"Request failed in calculate_distance_for_token: {e}")
         return 1
-
-    logger.info(f"completions_payload: \n{completions_payload}")
-    logger.info(f"validator_checking_response: \n{validator_checking_response}")
 
     text = chat_responses[index].content
     validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["top_logprobs"][0]
@@ -258,8 +253,6 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         "prompt_logprobs": 10,
         "add_special_tokens": False
     }
-
-    logger.info(f"first completion request:\n{completions_payload}")
 
     try:
         result = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
@@ -381,7 +374,6 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
                     )
                 )
         logger.info(f"index : {index} - token : {messages[index].content}")
-        logger.info(f"constructed llm request : \n{llm_request}")
         distance = await calculate_distance_for_token(task_config, llm_request, messages, index, starting_assistant_message)
         checks += 1
         total_distance += distance
