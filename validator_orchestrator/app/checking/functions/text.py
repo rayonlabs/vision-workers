@@ -143,6 +143,9 @@ async def calculate_distance_for_token(
         logger.error(f"Request failed in calculate_distance_for_token: {e}")
         return 1
 
+    logger.info(f"completions_payload: \n{completions_payload}")
+    logger.info(f"validator_checking_response: \n{validator_checking_response}")
+
     text = chat_responses[index].content
     validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["top_logprobs"][0]
 
@@ -297,11 +300,16 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         indices_to_check = [0]
     else:
         # Always check first & last
-        indices_to_check = [0, len(messages) - 1]
+        indices_to_check = [0, len(messages) - 1] 
+
+        if len(failed_tokens_idx)>0:
+            indices_to_check += failed_tokens_idx[:3]
+
+        remaining_indexes = list(set(range(0, len(messages))) - set(indices_to_check))
 
         number_of_additional_indices_to_check = min(5 - len(indices_to_check), len(messages) - 2) 
         additional_indices_to_check = random.sample(
-            range(1, len(messages) - 1),
+            remaining_indexes,
             number_of_additional_indices_to_check,
         )
         indices_to_check.extend(additional_indices_to_check)
