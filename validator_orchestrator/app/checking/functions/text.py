@@ -109,6 +109,24 @@ async def make_api_call(
         response = await client.post(endpoint, json=payload)
         return response.json()
 
+async def _process_think_tags_deepseek(prompt: str, messages: list[dict]) -> str:
+    assistant_message = next((m for m in messages if m['role'] == 'assistant'), None)
+    if not assistant_message:
+        return prompt
+        
+    content = assistant_message['content']
+    think_start = content.find('<think>')
+    think_end = content.find('</think>')
+    
+    if think_start == -1 or think_end == -1:
+        return prompt
+        
+    think_content = content[think_start:think_end + 8]
+    
+    assistant_token = '<｜Assistant｜>'
+    insert_pos = prompt.find(assistant_token) + len(assistant_token)
+    
+    return prompt[:insert_pos] + think_content + prompt[insert_pos:]
 
 async def calculate_distance_for_token(
     task_config: models.OrchestratorServerConfig,
@@ -125,6 +143,9 @@ async def calculate_distance_for_token(
             eos_token_id=task_config.load_model_config.get("eos_token_id", 128009),
             add_generation_prompt=starting_assistant_message,
         )
+        if 'deepseek-r1' in task_config.load_model_config['model'].lower():
+            prompt = await _process_think_tags_deepseek(prompt, messages)
+            
         logger.info(f"got messages: {messages}")
         logger.info(f"transformed to prompt: {prompt}")
     elif isinstance(llm_request, models.CompletionRequestModel):
