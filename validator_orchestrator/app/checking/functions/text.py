@@ -75,15 +75,10 @@ async def _tokenize_and_detokenize(input_payload: dict, model_name: str, eos_tok
         tokenize_response.raise_for_status()
         token_list: list[int] = tokenize_response.json()["tokens"]
 
-        if "llama-3" in model_name.lower() and not add_generation_prompt:
+        if ("llama-3" in model_name.lower() or 'deepseek-r1' in model_name.lower()) and not add_generation_prompt:
             last_eot_index = max((index for index, value in enumerate(token_list) if value == eos_token_id), default=None)
             if last_eot_index is not None:
                 token_list = token_list[:last_eot_index]
-
-        if 'deepseek-r1' in model_name.lower() and not add_generation_prompt:
-            last_eos_index = max((index for index, value in enumerate(token_list) if value == 151643), default=None)
-            if last_eos_index is not None:
-                token_list = token_list[:last_eos_index]
 
         detokenize_response = await http_client.post(url=f"{BASE_URL}/detokenize", json={"tokens": token_list, "model": model_name})
         detokenize_response.raise_for_status()
