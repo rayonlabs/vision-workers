@@ -219,7 +219,10 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         input_chat_content = payload[MESSAGES_KEY]
         input_content, num_input_tokens = await _chat_to_prompt(input_chat_content, task_config.load_model_config["model"], eos_token_id, add_generation_prompt=True)
         full_prompt_before_eos = input_content + full_response_content
-        all_tokens = await _tokenize(full_prompt_before_eos, task_config.load_model_config["model"], add_special_tokens=True)
+        if 'deepseek-r1' in task_config.load_model_config["model"].lower():
+            all_tokens = await _tokenize(full_prompt_before_eos, task_config.load_model_config["model"], add_special_tokens=False)
+        else:    
+            all_tokens = await _tokenize(full_prompt_before_eos, task_config.load_model_config["model"], add_special_tokens=True)
 
         # Make sure the last token is eos token where necessary, so we can check it with prompt logprobs
         if number_of_output_tokens != payload["max_tokens"] and all_tokens[-1] != eos_token_id:
