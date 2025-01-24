@@ -82,7 +82,7 @@ async def _tokenize_and_detokenize(input_payload: dict, model_name: str, eos_tok
 
         if 'deepseek-r1' in model_name.lower() and not add_generation_prompt:
             last_eos_index = max((index for index, value in enumerate(token_list) if value == 151643), default=None)
-            if last_eot_index is not None:
+            if last_eos_index is not None:
                 token_list = token_list[:last_eos_index]
             
 
