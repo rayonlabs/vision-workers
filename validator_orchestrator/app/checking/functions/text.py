@@ -80,10 +80,10 @@ async def _tokenize_and_detokenize(input_payload: dict, model_name: str, eos_tok
             if last_eot_index is not None:
                 token_list = token_list[:last_eot_index]
 
-        #if 'deepseek-r1' in model_name.lower() and not add_generation_prompt:
-        #    last_eos_index = max((index for index, value in enumerate(token_list) if value == 151643), default=None)
-        #    if last_eos_index is not None:
-        #        token_list = token_list[:last_eos_index]
+        if 'deepseek-r1' in model_name.lower() and not add_generation_prompt:
+            last_eos_index = max((index for index, value in enumerate(token_list) if value == 151643), default=None)
+            if last_eos_index is not None:
+                token_list = token_list[:last_eos_index]
 
         detokenize_response = await http_client.post(url=f"{BASE_URL}/detokenize", json={"tokens": token_list, "model": model_name})
         detokenize_response.raise_for_status()
@@ -92,7 +92,7 @@ async def _tokenize_and_detokenize(input_payload: dict, model_name: str, eos_tok
 
 
 async def _chat_to_prompt(messages: list[dict], model_name: str, eos_token_id: int = 128009, add_generation_prompt: bool = True) -> tuple[str, int]:
-    input_payload = {"model": model_name, "messages": messages}
+    input_payload = {"model": model_name, "messages": messages, "add_special_tokens": False}
     return await _tokenize_and_detokenize(input_payload, model_name, eos_token_id, add_generation_prompt)
 
 
