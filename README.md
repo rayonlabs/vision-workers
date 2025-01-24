@@ -1,7 +1,7 @@
 <div align="center">
 
 # **👀 Vision Workers [τ, τ] SN19: Starter Guide for Miners & Validators**
-Providing Access to Bittensor with Decentralized Subnet Inference at Scale
+Providing Access to Bittensor with Decentralized Subnet Inference at Scale 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
