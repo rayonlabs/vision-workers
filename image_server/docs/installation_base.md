@@ -8,7 +8,7 @@ In order to run the server on bare metal, you will need Nvidia drivers, cuda too
 
 ## 2. Pull the image
 ```bash
-docker pull corcelio/vision:image_server-latest
+docker pull nineteenai/sn19:image_server-latest
 ```
 ## 3. Running the image
 
@@ -55,13 +55,13 @@ docker volume create COMFY
 
 Here's just an example command (with docker volumes)
 ```bash
-docker pull corcelio/vision:image_server-latest
-docker run --rm -d -v COMFY:/app/image_server/ComfyUI -v HF:/app/cache -p 6919:6919 --runtime=nvidia --gpus '"device=0"' -e PORT=6919 -e DEVICE=0 corcelio/vision:image_server-latest
+docker pull nineteenai/sn19:image_server-latest
+docker run --rm -d -v COMFY:/app/image_server/ComfyUI -v HF:/app/cache -p 6919:6919 --runtime=nvidia --gpus '"device=0"' -e PORT=6919 -e DEVICE=0 nineteenai/sn19:image_server-latest
 ```
 or
 ```bash
-docker pull corcelio/vision:image_server-latest
-docker run --rm -d -v HF:/app/cache -p 6919:6919 --runtime=nvidia --gpus=all -e PORT=6919 -e DEVICE=0  corcelio/vision:image_server-latest
+docker pull nineteenai/sn19:image_server-latest
+docker run --rm -d -v HF:/app/cache -p 6919:6919 --runtime=nvidia --gpus=all -e PORT=6919 -e DEVICE=0  nineteenai/sn19:image_server-latest
 ```
 
 To start another machine on the same instance:
@@ -69,12 +69,12 @@ To start another machine on the same instance:
 KEEP THE ENV VAR -e DEVICE=0 the same!
 
 ```bash
-docker run --rm -d -v COMFY:/app/image_server/ComfyUI -v HF:/app/cache -p 6918:6918 --runtime=nvidia --gpus '"device=1"' -e PORT=6918 -e DEVICE=0 corcelio/vision:image_server-latest
+docker run --rm -d -v COMFY:/app/image_server/ComfyUI -v HF:/app/cache -p 6918:6918 --runtime=nvidia --gpus '"device=1"' -e PORT=6918 -e DEVICE=0 nineteenai/sn19:image_server-latest
 ```
 or
 ```bash
-docker pull corcelio/vision:image_server-latest
-docker run --rm -d -v HF:/app/cache -p 6918:6918 --runtime=nvidia --gpus=all -e PORT=6918 -e DEVICE=0 corcelio/vision:image_server-latest
+docker pull nineteenai/sn19:image_server-latest
+docker run --rm -d -v HF:/app/cache -p 6918:6918 --runtime=nvidia --gpus=all -e PORT=6918 -e DEVICE=0 nineteenai/sn19:image_server-latest
 ```
 
 ## [Troubleshooting](../../generic_docs/troubleshooting.md)
