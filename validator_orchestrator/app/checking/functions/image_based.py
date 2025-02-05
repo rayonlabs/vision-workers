@@ -35,7 +35,7 @@ async def _get_image_similarity(
     probability_same_image_xg = images_are_same_classifier.predict_proba([hash_distances])[0][1]
 
     #If the miner's image is blatantly different from the expected image, assign score of -10 
-    if clip_embedding_similiarity < 0:
+    if clip_embedding_similiarity < 0.6:
         return -10
 
     # MODEL has a very low threshold
