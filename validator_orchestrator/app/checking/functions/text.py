@@ -75,7 +75,7 @@ async def _tokenize_and_detokenize(input_payload: dict, model_name: str, eos_tok
         tokenize_response.raise_for_status()
         token_list: list[int] = tokenize_response.json()["tokens"]
 
-        if "llama-3" in model_name.lower() and not add_generation_prompt:
+        if ("llama-3" in model_name.lower() or 'deepseek-r1' in model_name.lower()) and not add_generation_prompt:
             last_eot_index = max((index for index, value in enumerate(token_list) if value == eos_token_id), default=None)
             if last_eot_index is not None:
                 token_list = token_list[:last_eot_index]
@@ -87,7 +87,7 @@ async def _tokenize_and_detokenize(input_payload: dict, model_name: str, eos_tok
 
 
 async def _chat_to_prompt(messages: list[dict], model_name: str, eos_token_id: int = 128009, add_generation_prompt: bool = True) -> tuple[str, int]:
-    input_payload = {"model": model_name, "messages": messages}
+    input_payload = {"model": model_name, "messages": messages, "add_special_tokens": False}
     return await _tokenize_and_detokenize(input_payload, model_name, eos_token_id, add_generation_prompt)
 
 
@@ -136,6 +136,25 @@ async def query_endpoint_with_status(
             logger.error(f"HTTP error occurred: {e}")
             return None, status_code
 
+async def _process_think_tags_deepseek(prompt: str, messages: list[dict]) -> str:
+    assistant_message = next((m for m in messages if m['role'] == 'assistant'), None)
+    if not assistant_message:
+        return prompt
+        
+    content = assistant_message['content']
+    think_start = content.find('<think>')
+    think_end = content.find('</think>')
+    
+    if think_start == -1 or think_end == -1:
+        return prompt
+        
+    think_content = content[think_start:think_end + 8]
+    
+    assistant_token = '<｜Assistant｜>'
+    insert_pos = prompt.find(assistant_token) + len(assistant_token)
+    
+    return prompt[:insert_pos] + think_content + prompt[insert_pos:]
+
 async def calculate_distance_for_token(
     task_config: models.OrchestratorServerConfig,
     llm_request: Union[models.ChatRequestModel, models.CompletionRequestModel],
@@ -151,6 +170,9 @@ async def calculate_distance_for_token(
             eos_token_id=task_config.load_model_config.get("eos_token_id", 128009),
             add_generation_prompt=starting_assistant_message,
         )
+        if 'deepseek-r1' in task_config.load_model_config['model'].lower():
+            prompt = await _process_think_tags_deepseek(prompt, messages)
+            
     elif isinstance(llm_request, models.CompletionRequestModel):
         prompt = llm_request.prompt
 
@@ -252,7 +274,10 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         input_chat_content = payload[MESSAGES_KEY]
         input_content, num_input_tokens = await _chat_to_prompt(input_chat_content, task_config.load_model_config["model"], eos_token_id, add_generation_prompt=True)
         full_prompt_before_eos = input_content + full_response_content
-        all_tokens = await _tokenize(full_prompt_before_eos, task_config.load_model_config["model"], add_special_tokens=True)
+        if 'deepseek-r1' in task_config.load_model_config["model"].lower():
+            all_tokens = await _tokenize(full_prompt_before_eos, task_config.load_model_config["model"], add_special_tokens=False)
+        else:    
+            all_tokens = await _tokenize(full_prompt_before_eos, task_config.load_model_config["model"], add_special_tokens=True)
 
         # Make sure the last token is eos token where necessary, so we can check it with prompt logprobs
         if number_of_output_tokens != payload["max_tokens"] and all_tokens[-1] != eos_token_id:
@@ -338,11 +363,16 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         indices_to_check = [0]
     else:
         # Always check first & last
-        indices_to_check = [0, len(messages) - 1] + failed_tokens_idx
+        indices_to_check = [0, len(messages) - 1] 
+
+        if len(failed_tokens_idx)>0:
+            indices_to_check += failed_tokens_idx[:3]
+
+        remaining_indexes = list(set(list(set(range(0, len(messages))) - set(indices_to_check))))
 
         number_of_additional_indices_to_check = min(5 - len(indices_to_check), len(messages) - 2) 
         additional_indices_to_check = random.sample(
-            range(1, len(messages) - 1),
+            remaining_indexes,
             number_of_additional_indices_to_check,
         )
         indices_to_check.extend(additional_indices_to_check)
@@ -365,7 +395,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         llm_request = models.ChatRequestModel(**payload)
         llm_request.max_tokens = 1
 
-    for index in indices_to_check:
+    for i, index in enumerate(indices_to_check):
         if checks >= 5:
             break
 
@@ -374,7 +404,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
             llm_request.prompt += text_to_inject_for_checking
             starting_assistant_message = False
         else:
-            starting_assistant_message = index == 0
+            starting_assistant_message = i == 0
             if index > 0:
                 text_to_inject_into_assistant_message = "".join([i.content for i in messages[:index]])
                 llm_request.messages.append(
@@ -385,6 +415,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
                         }
                     )
                 )
+        logger.info(f"index : {index} - token : {messages[index].content}")
         distance = await calculate_distance_for_token(task_config, llm_request, messages, index, starting_assistant_message)
         checks += 1
         total_distance += distance

@@ -34,6 +34,10 @@ async def _get_image_similarity(
 
     probability_same_image_xg = images_are_same_classifier.predict_proba([hash_distances])[0][1]
 
+    #If the miner's image is blatantly different from the expected image, assign score of -10 
+    if clip_embedding_similiarity < 0.6:
+        return -10
+
     # MODEL has a very low threshold
     score = float(probability_same_image_xg**0.5) * 0.4 + (clip_embedding_similiarity**2) * 0.6
     if score > 0.95:
@@ -88,7 +92,7 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
         return None
 
     if expected_image_response.is_nsfw != image_response_body.is_nsfw:
-        return 0
+        return -10
 
     else:
         return await _get_image_similarity(
