@@ -65,8 +65,8 @@ class TextToImageBase(BaseModel):
     steps: int = Field(..., description="Number of inference steps, higher for more quality but increased generation time", gt=4, lt=50)
     model: str = Field(..., description="The engine to use for image generation")
     cfg_scale: float = Field(..., description="Guidance scale", gt=1.5, lt=12)
-    height: int = Field(..., description="Height of the output image in pixels", gt=512, lt=2048)
-    width: int = Field(..., description="Width of the output image in pixels", gt=512, lt=2048)
+    height: int = Field(..., description="Height of the output image in pixels", ge=512, lt=2048)
+    width: int = Field(..., description="Width of the output image in pixels", ge=512, lt=2048)
     seed: int = Field(..., description="Seed value for deterministic outputs", ge=0)
     sampler: SamplerEnum = Field(default=SamplerEnum.DPMPP_SDE_GPU, description="The sampling method to use during image generation")
     scheduler: SchedulerEnum = Field(default=SchedulerEnum.KARRAS, description="The scheduler to use for adjusting noise and guidance during generation")
@@ -95,8 +95,8 @@ class AvatarBase(BaseModel):
     ipadapter_strength: float = Field(..., description="IP Adapter strength, increase for more face coherence, works best on default", gt=0.1, le=1)
     control_strength: float = Field(..., description="Control strength, increase for more face coherence, works best on default", gt=0.1, le=1.01)
     steps: int = Field(..., description="Number of inference steps, higher for more quality but increased generation time", gt=4, lt=50)
-    height: int = Field(..., description="Height of the output image in pixels", gt=512, lt=2048)
-    width: int = Field(..., description="Width of the output image in pixels", gt=512, lt=2048)
+    height: int = Field(..., description="Height of the output image in pixels", ge=512, lt=2048)
+    width: int = Field(..., description="Width of the output image in pixels", ge=512, lt=2048)
     seed: int = Field(..., description="Seed value for deterministic outputs", ge=0)
 
 
