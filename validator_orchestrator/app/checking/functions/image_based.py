@@ -77,7 +77,7 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
         if str(vali_status_code) == str(miner_status_code):
             return 1
         else:
-            return 0
+            return -10
 
     image_response_body = utility_models.ImageResponseBody(**result.formatted_response)
 
