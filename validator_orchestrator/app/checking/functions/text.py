@@ -220,7 +220,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         if str(vali_status_code) == str(miner_status_code):
             return 1
         else:
-            return -10
+            return 0.1
     
     formatted_response = json.loads(result.formatted_response) if isinstance(result.formatted_response, str) else result.formatted_response
     eos_token_id = task_config.load_model_config.get("eos_token_id", 128009)
