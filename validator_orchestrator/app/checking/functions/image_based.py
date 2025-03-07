@@ -77,7 +77,7 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
         if str(vali_status_code)[0] == str(miner_status_code)[0]:
             return 1
         else:
-            return -3
+            return -1
 
     image_response_body = utility_models.ImageResponseBody(**result.formatted_response)
 
@@ -92,7 +92,7 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
         return None
 
     if expected_image_response.is_nsfw != image_response_body.is_nsfw:
-        return -10
+        return -2
 
     else:
         return await _get_image_similarity(
