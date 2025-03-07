@@ -100,7 +100,7 @@ async def make_api_call(
     payload: dict,
     endpoint: str,
 ) -> dict:
-    async with httpx.AsyncClient(timeout=20) as client:
+    async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(endpoint, json=payload)
         return response.json()
 
@@ -301,7 +301,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     except (httpx.RequestError, json.JSONDecodeError) as e:
         logger.exception(e)
         logger.error(f"API call failed: {e}")
-        return 0.0
+        return 0.5
 
     prompt_logprobs = result["choices"][0]["prompt_logprobs"][num_input_tokens:]
 
