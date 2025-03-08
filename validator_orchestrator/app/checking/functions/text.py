@@ -301,7 +301,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     except (httpx.RequestError, json.JSONDecodeError) as e:
         logger.exception(e)
         logger.error(f"API call failed: {e}")
-        return 0.5
+        return 0.9876
 
     prompt_logprobs = result["choices"][0]["prompt_logprobs"][num_input_tokens:]
 
