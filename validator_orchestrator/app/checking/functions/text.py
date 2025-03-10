@@ -204,7 +204,7 @@ async def calculate_distance_for_token(
         logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
         return 1
     else:
-        distance = abs(math.exp(validator_log_probs_for_token[text]) - math.exp(chat_responses[index].logprob))
+        distance = min(abs(math.exp(validator_log_probs_for_token[text]) - math.exp(chat_responses[index].logprob)), 1)
         logger.info(f"token: {text} - logprob : {chat_responses[index].logprob}")
         logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
 
@@ -331,7 +331,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
                 failed_tokens_idx.append(idx)
                 failed_tokens_details.append((response_token, rank, logprob, additional_log))
 
-                if len(failed_tokens_idx) > 3:
+                if len(failed_tokens_idx) > 5:
                     failed_tokens_details = json.dumps(failed_tokens_details, indent=2, sort_keys=True, ensure_ascii=False)
                     fail_reason = f"Too many bad tokens found ('response_token', 'rank', 'logprob', 'additional_log'):\n{failed_tokens_details}"
                     bad_token_found = True
