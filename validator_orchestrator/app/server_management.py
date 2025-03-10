@@ -161,7 +161,7 @@ class ServerManager:
 
         sleep(2)
 
-        shared_vol_size = os.getenv("SHARED_VOLUME_SIZE", "10g")
+        shared_vol_size = os.getenv("SHARED_VOLUME_SIZE", "100g")
 
         command = (
             f"docker run -d --rm --shm-size={shared_vol_size} --name {server_config.name} "
