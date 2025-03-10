@@ -170,7 +170,7 @@ async def calculate_distance_for_token(
             eos_token_id=task_config.load_model_config.get("eos_token_id", 128009),
             add_generation_prompt=starting_assistant_message,
         )
-        if 'deepseek-r1' in task_config.load_model_config['model'].lower():
+        if 'deepseek-r1' in task_config.load_model_config['model'].lower() or 'qwq' in task_config.load_model_config['model'].lower():
             prompt = await _process_think_tags_deepseek(prompt, messages)
             
     elif isinstance(llm_request, models.CompletionRequestModel):
