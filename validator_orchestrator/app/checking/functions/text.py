@@ -145,16 +145,10 @@ async def _process_think_tags_deepseek(prompt: str, messages: list[dict]) -> str
     think_start = content.find('<think>')
     think_end = content.find('</think>')
     
-    # Case 1: no think tags at all
-    if think_start == -1 and think_end == -1:
+    if think_start == -1 or think_end == -1:
         return prompt
-    
-    # Case 2: only closing tag exists
-    if think_start == -1 and think_end != -1:
-        think_content = content[:think_end + 8]
-    # Case 3: both tags exist
-    else:
-        think_content = content[think_start:think_end + 8]
+        
+    think_content = content[think_start:think_end + 8]
     
     assistant_token = '<｜Assistant｜>'
     insert_pos = prompt.find(assistant_token) + len(assistant_token)
@@ -177,7 +171,7 @@ async def calculate_distance_for_token(
             add_generation_prompt=starting_assistant_message,
         )
         if 'deepseek-r1' in task_config.load_model_config['model'].lower() or 'qwq' in task_config.load_model_config['model'].lower():
-            prompt = await _process_think_tags_deepseek(prompt, messages, )
+            prompt = await _process_think_tags_deepseek(prompt, messages)
             
     elif isinstance(llm_request, models.CompletionRequestModel):
         prompt = llm_request.prompt
