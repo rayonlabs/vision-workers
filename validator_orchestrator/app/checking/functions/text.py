@@ -87,7 +87,7 @@ async def _tokenize_and_detokenize(input_payload: dict, model_name: str, eos_tok
 
 
 async def _chat_to_prompt(messages: list[dict], model_name: str, eos_token_id: int = 128009, add_generation_prompt: bool = True) -> tuple[str, int]:
-    input_payload = {"model": model_name, "messages": messages, "add_special_tokens": False}
+    input_payload = {"model": model_name, "messages": messages, "add_special_tokens": True}
     return await _tokenize_and_detokenize(input_payload, model_name, eos_token_id, add_generation_prompt)
 
 
