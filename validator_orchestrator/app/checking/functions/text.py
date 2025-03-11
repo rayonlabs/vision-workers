@@ -137,23 +137,86 @@ async def query_endpoint_with_status(
             return None, status_code
 
 async def _process_think_tags_deepseek(prompt: str, messages: list[dict]) -> str:
-    assistant_message = next((m for m in messages if m['role'] == 'assistant'), None)
-    if not assistant_message:
-        return prompt
-        
-    content = assistant_message['content']
-    think_start = content.find('<think>')
-    think_end = content.find('</think>')
+    assistant_think_pairs = []
     
-    if think_start == -1 or think_end == -1:
+    for message in messages:
+        if message['role'] == 'assistant':
+            content = message['content']
+            think_start = content.find('<think>')
+            think_end = content.rfind('</think>')
+            
+            if think_start != -1 and think_end != -1:
+                think_content = content[think_start:think_end + 8]
+                assistant_think_pairs.append(think_content)
+    
+    if not assistant_think_pairs:
         return prompt
-        
-    think_content = content[think_start:think_end + 8]
     
     assistant_token = '<｜Assistant｜>'
-    insert_pos = prompt.find(assistant_token) + len(assistant_token)
+    assistant_positions = []
+    pos = 0
     
-    return prompt[:insert_pos] + think_content + prompt[insert_pos:]
+    while True:
+        pos = prompt.find(assistant_token, pos)
+        if pos == -1:
+            break
+        assistant_positions.append(pos + len(assistant_token))
+        pos += len(assistant_token)
+    
+    if len(assistant_think_pairs) > len(assistant_positions):
+        assistant_think_pairs = assistant_think_pairs[-len(assistant_positions):]
+    
+    modified_prompt = prompt
+    for i in range(min(len(assistant_positions), len(assistant_think_pairs)) - 1, -1, -1):
+        insert_pos = assistant_positions[i]
+        think_content = assistant_think_pairs[i]
+        
+        if not modified_prompt[insert_pos:].startswith(think_content):
+            modified_prompt = modified_prompt[:insert_pos] + think_content + modified_prompt[insert_pos:]
+    
+    return modified_prompt
+
+async def _process_think_tags_qwen_qwq(prompt: str, messages: list[dict]) -> str:
+    assistant_think_pairs = []
+    
+    for message in messages:
+        if message['role'] == 'assistant':
+            content = message['content']
+            think_end = content.find('</think>')
+            
+            if think_end != -1:
+                think_content = content[:think_end + 8]  # includes the </think> tag
+                assistant_think_pairs.append(think_content)
+    
+    if not assistant_think_pairs:
+        return prompt
+    
+    assistant_token = '<|im_start|>assistant'
+    assistant_positions = []
+    pos = 0
+    
+    while True:
+        pos = prompt.find(assistant_token, pos)
+        if pos == -1:
+            break
+        insert_pos = pos + len(assistant_token)
+        if insert_pos < len(prompt) and prompt[insert_pos] == '\n':
+            insert_pos += 1
+        assistant_positions.append(insert_pos)
+        pos += len(assistant_token)
+    
+    if len(assistant_think_pairs) > len(assistant_positions):
+        assistant_think_pairs = assistant_think_pairs[-len(assistant_positions):]
+    
+    modified_prompt = prompt
+    for i in range(min(len(assistant_positions), len(assistant_think_pairs)) - 1, -1, -1):
+        insert_pos = assistant_positions[i]
+        think_content = assistant_think_pairs[i]
+        
+        if not modified_prompt[insert_pos:].startswith(think_content):
+            modified_prompt = modified_prompt[:insert_pos] + think_content + modified_prompt[insert_pos:]
+    
+    return modified_prompt
 
 async def calculate_distance_for_token(
     task_config: models.OrchestratorServerConfig,
@@ -170,8 +233,13 @@ async def calculate_distance_for_token(
             eos_token_id=task_config.load_model_config.get("eos_token_id", 128009),
             add_generation_prompt=starting_assistant_message,
         )
+        logger.info(f"prompt before injecting reasoning tokens:\n{prompt}")
         if 'deepseek-r1' in task_config.load_model_config['model'].lower():
             prompt = await _process_think_tags_deepseek(prompt, messages)
+        
+        if 'qwq' in task_config.load_model_config['model'].lower():
+            prompt = await _process_think_tags_qwen_qwq(prompt, messages)
+        logger.info(f"prompt after injecting reasoning tokens:\n{prompt}")
             
     elif isinstance(llm_request, models.CompletionRequestModel):
         prompt = llm_request.prompt
