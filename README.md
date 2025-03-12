@@ -39,11 +39,11 @@ Refer to the [Runpod Setup Guide](https://github.com/namoray/vision/blob/product
 Refer to the following guides:
 1. [Setting Up Your Hardware](generic_docs/bootstrap.md)
 2. [Image Server Installation](image_server/docs/installation_base.md)
-3. [LLM Server Installation](llm_server/docs/installation_base.md)
+3. [LLM Server Installation](https://docs.vllm.ai/en/stable/deployment/docker.html)
 
 # Conclusion
 
-Please refer to the [Proxy setup](https://github.com/namoray/vision/tree/main/docs) page in order to set up the proxy.
+Please refer to the [Proxy setup](https://github.com/rayonlabs/nineteen/tree/production/docs) page in order to set up the proxy.
 
 For further assistance, refer to the [Bittensor Documentation](https://docs.bittensor.com/) and join our [Discord](https://discord.gg/dR865yTPaZ).
 
