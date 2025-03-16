@@ -21,6 +21,7 @@ If you used the bootstrap script you should be good to go already (check with do
 
 If you need to start it manually at any time, try this:
 ```bash
+python3 create_config.py #to create config
 ./launch_orchestrator.sh
 ```
 
