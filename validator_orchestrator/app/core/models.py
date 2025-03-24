@@ -26,11 +26,13 @@ class ChatTokens(BaseModel):
 class ServerType(Enum):
     LLM = "llm_server"
     IMAGE = "image_server"
+    SPEECH_CSM = "speech_server_csm"
 
 
 class ProdDockerImages(Enum):
     LLM = "vllm/vllm-openai:v0.6.4.post1"
     IMAGE = "nineteenai/sn19:image_server-latest"
+    SPEECH_CSM="nineteenai/sn19:speech_csm_server-latest"
 
 
 class ModelConfigDetails(BaseModel):

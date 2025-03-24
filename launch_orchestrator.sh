@@ -1,6 +1,7 @@
 #!/bin/bash
 ORCHESTRATOR_IMAGE="nineteenai/sn19:orchestrator-latest"
 IMAGE_SERVER_IMAGE="nineteenai/sn19:image_server-latest"
+CSM_SERVER_IMAGE="nineteenai/sn19:speech_csm_server-latest"
 PORT=6920
 REFRESH_LOCAL_IMAGES=1
 
@@ -21,6 +22,10 @@ while [[ "$#" -gt 0 ]]; do
   --image-server-image)
     IMAGE_SERVER_IMAGE="$2"
     shift
+    ;;
+  --csm-server-image) 
+    CSM_SERVER_IMAGE="$2" 
+    shift 
     ;;
   --port)
     PORT="$2"
@@ -45,6 +50,7 @@ DOCKER_RUN_FLAGS="--rm \
                   -v /var/run/docker.sock:/var/run/docker.sock \
                   -e LLM_SERVER_DOCKER_IMAGE=$LLM_IMAGE \
                   -e IMAGE_SERVER_DOCKER_IMAGE=$IMAGE_SERVER_IMAGE \
+                  -e CSM_SERVER_DOCKER_IMAGE=$CSM_SERVER_IMAGE \
                   --network $NETWORK"
 
 # Add the --runtime=nvidia flag unless --no-runtime-flag is specified
@@ -98,11 +104,13 @@ check_and_pull_image() {
 }
 check_and_pull_image $ORCHESTRATOR_IMAGE
 check_and_pull_image $IMAGE_SERVER_IMAGE
+check_and_pull_image $CSM_SERVER_IMAGE
 
 echo "Got up to date images, Making volumes...."
 
 docker volume inspect HF >/dev/null 2>&1 || docker volume create HF
 docker volume inspect COMFY >/dev/null 2>&1 || docker volume create COMFY
+docker volume inspect CSM >/dev/null 2>&1 || docker volume create CSM
 
 docker network inspect $NETWORK >/dev/null 2>&1 || docker network create $NETWORK
 

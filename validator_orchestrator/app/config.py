@@ -42,6 +42,18 @@ checking_server_configs: list[CheckingServerConfig] = [
         network=shared_network,
         external_port=6919,
     ),
+    CheckingServerConfig(
+            name=ServerType.SPEECH_CSM.value,
+            docker_image=os.getenv("CSM_SERVER_DOCKER_IMAGE", ProdDockerImages.SPEECH_CSM), 
+            port=6919, 
+            port_internal=6919,
+            volumes={
+                "CSM": "/root/.local/share/tts",
+            },
+            env_vars={},
+            network=shared_network,
+            external_port=6919
+        ),
 ]
 
 
