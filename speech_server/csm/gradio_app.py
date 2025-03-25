@@ -19,16 +19,27 @@ def encode_audio_to_base64(audio_path):
     return f"data:audio/wav;base64,{base64_audio}"
 
 def call_api(caption_a, audio_a, caption_b, audio_b, conversation, seed):
+    # Check if conversation has multiple lines
+    lines = [line.strip() for line in conversation.split('\n') if line.strip()]
+    multi_turn = len(lines) > 1
+    
     # Convert uploaded files to base64 strings
     try:
         audio_b64_a = encode_audio_to_base64(audio_a)
-        audio_b64_b = encode_audio_to_base64(audio_b)
+        
+        # Only include speaker B if it's a multi-turn conversation
+        if multi_turn:
+            if not audio_b:
+                raise gr.Error("Speaker B audio is required for multi-turn conversations")
+            audio_b64_b = encode_audio_to_base64(audio_b)
+        else:
+            audio_b64_b = ""  # Empty string if not needed
 
         data = {
             "text_prompt_a": caption_a,
             "audio_prompt_a": audio_b64_a,
-            "text_prompt_b": caption_b,
-            "audio_prompt_b": audio_b64_b,
+            "text_prompt_b": caption_b if multi_turn else "",
+            "audio_prompt_b": audio_b64_b if multi_turn else "",
             "conversation": conversation,
             "seed": int(seed),
             "max_audio_length_ms": 30000
@@ -47,17 +58,21 @@ def call_api(caption_a, audio_a, caption_b, audio_b, conversation, seed):
         print(f"Error during API call: {e}")
         return None
 
+def toggle_speaker_b_visibility(conversation):
+    lines = [line.strip() for line in conversation.split('\n') if line.strip()]
+    return gr.update(visible=len(lines) > 1)
+
 with gr.Blocks() as app:
-    gr.Markdown("# 🗣️ Two-Speaker Voice Cloning\nProvide two voice samples and captions. Enter a multi-turn conversation with alternating lines.")
+    gr.Markdown("# 🗣️ Two-Speaker Voice Cloning\nProvide voice samples and captions. Speaker B is only needed for multi-turn conversations.")
     
     with gr.Row():
         with gr.Column():
             caption_a = gr.Textbox(label="Caption for Speaker A", value="This is speaker A.")
             audio_a = gr.Audio(label="Speaker A Audio (.wav, ~6s)", type="filepath")
         
-        with gr.Column():
+        with gr.Column() as speaker_b_col:
             caption_b = gr.Textbox(label="Caption for Speaker B", value="This is speaker B.")
-            audio_b = gr.Audio(label="Speaker B Audio (.wav, ~6s)", type="filepath")
+            audio_b = gr.Audio(label="Speaker B Audio (.wav, ~6s)", type="filepath", visible=False)
     
     conversation_input = gr.Textbox(
         label="Conversation (one line per speaker turn)",
@@ -69,6 +84,13 @@ with gr.Blocks() as app:
     
     submit_btn = gr.Button("Generate Conversation", variant="primary")
     output_audio = gr.Audio(label="Generated Conversation", interactive=False)
+
+    # Show/hide speaker B inputs based on conversation lines
+    conversation_input.change(
+        fn=toggle_speaker_b_visibility,
+        inputs=conversation_input,
+        outputs=audio_b
+    )
 
     submit_btn.click(
         fn=call_api,
