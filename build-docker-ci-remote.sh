@@ -22,7 +22,7 @@ if [ "$disk_usage" -gt 50 ]; then
     docker image ls --format "{{.Repository}}:{{.Tag}} {{.CreatedAt}}" | grep "${IMAGE_PREFIX}/cicd" | sort -rk2 > /tmp/docker_images.txt
     latest_orchestrator=$(grep 'orchestrator-' /tmp/docker_images.txt | head -n 1 | awk '{print $1}')
     latest_image_server=$(grep 'image-server-' /tmp/docker_images.txt | head -n 1 | awk '{print $1}')
-    latest_speech_server_csm=$(grep 'speech-server-csm-' /tmp/docker_images.txt | head -n 1 | awk '{print $1}')
+    latest_speech_server_csm=$(grep 'speech-csm-server' /tmp/docker_images.txt | head -n 1 | awk '{print $1}')
     echo $latest_orchestrator >> /tmp/keep_images.txt
     echo $latest_image_server >> /tmp/keep_images.txt
     echo $latest_speech_server_csm >> /tmp/keep_images.txt

@@ -10,6 +10,7 @@ class TaskType(Enum):
 class ServerType(Enum):
     LLM = "llm_server"
     IMAGE = "image_server"
+    SPEECH_CSM = "speech_server_csm"
 
 
 class Endpoints(Enum):
@@ -31,7 +32,7 @@ class TaskScoringConfig(BaseModel):
 
 
 class OrchestratorServerConfig(BaseModel):
-    server_needed: ServerType = Field(examples=[ServerType.LLM, ServerType.IMAGE])
+    server_needed: ServerType = Field(examples=[ServerType.LLM, ServerType.IMAGE, ServerType.SPEECH_CSM])
     load_model_config: dict | None = Field(examples=[None])
     checking_function: str = Field(examples=["check_text_result", "check_image_result"])
     task: str = Field(examples=["chat_llama_3_2_3b"])

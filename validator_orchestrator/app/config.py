@@ -43,17 +43,28 @@ checking_server_configs: list[CheckingServerConfig] = [
         external_port=6919,
     ),
     CheckingServerConfig(
-            name=ServerType.SPEECH_CSM.value,
-            docker_image=os.getenv("CSM_SERVER_DOCKER_IMAGE", ProdDockerImages.SPEECH_CSM), 
-            port=6919, 
-            port_internal=6919,
-            volumes={
-                "CSM": "/root/.local/share/tts",
-            },
-            env_vars={},
-            network=shared_network,
-            external_port=6919
-        ),
+        name=ServerType.SPEECH_CSM.value,
+        docker_image=os.getenv("CSM_SERVER_DOCKER_IMAGE", ProdDockerImages.SPEECH_CSM), 
+        port=6919, 
+        port_internal=6919,
+        volumes={
+            "CSM": "/root/.local/share/tts",
+        },
+        env_vars={},
+        network=shared_network,
+        external_port=6919
+    ),
+    CheckingServerConfig(
+        name=ServerType.SPEECH_IMAGEBIND.value,
+        docker_image=os.getenv("IMAGEBIND_SERVER_DOCKER_IMAGE", ProdDockerImages.SPEECH_IMAGEBIND), 
+        port=6918, 
+        port_internal=6918,
+        volumes={
+            "IMAGEBIND": "/app/speech_server/ImageBind/.checkpoints"
+        },
+        network=shared_network
+    ),
+
 ]
 
 

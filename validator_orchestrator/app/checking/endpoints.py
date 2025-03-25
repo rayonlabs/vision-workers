@@ -91,9 +91,22 @@ async def process_check_result(
 
             load_model_config = task_config.load_model_config
 
-            flags = _get_llm_server_docker_flags(task_config)
-            load_model_config["extra-docker-flags"] = flags
-            await server_manager.start_server(server_needed, load_model_config)
+            if server_needed.name.startswith("LLM"):
+                flags = _get_llm_server_docker_flags(task_config)
+                load_model_config["extra-docker-flags"] = flags
+                logger.info("---- Checking an LLM result, which is a non-speech result!... ensuring ImageBind isn't booted up!")
+                server_manager._kill_process_on_port(6918)
+            elif server_needed.name.startswith("SPEECH") and server_needed.name != "SPEECH_WHISPER":
+                logger.info("---- Checking a speech result!... required ImageBind worker, bootin' that up!")
+                server_needed_prereq = models.ServerType.SPEECH_IMAGEBIND
+                await server_manager.start_server(server_needed_prereq)
+            else:
+                logger.info("---- Checking a non-speech result!... ensuring ImageBind isn't booted up!")
+                server_manager._kill_process_on_port(6918)
+
+            await server_manager.start_server(server_needed)
+
+            load_model_config = task_config.load_model_config
 
             if load_model_config is not None:
                 # TODO: Why is this needed? Slows down checking *alot*

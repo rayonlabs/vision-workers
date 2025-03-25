@@ -39,3 +39,6 @@ class ImageResponseBody(BaseModel):
 
 class ClipEmbeddingsResponse(BaseModel):
     clip_embeddings: Optional[List[List[float]]] = None
+
+class CSMResponseBody(BaseModel):
+    audio_b64: Optional[str] = None

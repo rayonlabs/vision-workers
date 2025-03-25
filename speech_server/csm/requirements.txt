@@ -1,0 +1,18 @@
+--extra-index-url https://download.pytorch.org/whl/cu124
+httpx==0.27.0
+fastapi==0.110.0
+uvicorn==0.28.1
+numpy==1.22.0
+loguru==0.7.2
+pydantic==2.7.1
+packaging
+git+https://github.com/tripathiarpan20/BentoML.git@deea3a272f4228b71db36d540ca836eeff687232
+
+csm @ git+https://github.com/SesameAILabs/csm.git
+python-multipart==0.0.6
+typing-extensions>=4.8.0
+cutlet
+mecab-python3
+unidic-lite
+langid
+pydub
