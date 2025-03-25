@@ -35,15 +35,25 @@ def call_api(caption_a, audio_a, caption_b, audio_b, conversation, seed):
         else:
             audio_b64_b = ""  # Empty string if not needed
 
-        data = {
-            "text_prompt_a": caption_a,
-            "audio_prompt_a": audio_b64_a,
-            "text_prompt_b": caption_b if multi_turn else "",
-            "audio_prompt_b": audio_b64_b if multi_turn else "",
-            "conversation": conversation,
-            "seed": int(seed),
-            "max_audio_length_ms": 30000
-        }
+        if multi_turn:
+            data = {
+                "text_prompt_a": caption_a,
+                "audio_prompt_a": audio_b64_a,
+                "text_prompt_b": caption_b ,
+                "audio_prompt_b": audio_b64_b ,
+                "conversation": conversation,
+                "seed": int(seed),
+                "max_audio_length_ms": 30000
+            }
+        else:
+            data = {
+                "text_prompt_a": caption_a,
+                "audio_prompt_a": audio_b64_a,
+                "conversation": conversation,
+                "seed": int(seed),
+                "max_audio_length_ms": 30000
+            }
+
 
         response = requests.post(args.url, json=data)
         response_data = response.json()
@@ -77,7 +87,7 @@ with gr.Blocks() as app:
     conversation_input = gr.Textbox(
         label="Conversation (one line per speaker turn)",
         lines=6,
-        value="Hey how are you doing.\nPretty good, pretty good.\nI'm great, so happy to be speaking to you."
+        value="Hey how are you doing.\n"
     )
     
     seed_input = gr.Number(value=0, label="Seed (integer)")
