@@ -58,24 +58,25 @@ class CSM:
         torch.backends.cudnn.deterministic = True
 
         # Process audio prompts
-        def decode_audio(base64_str: str) -> Segment:
+        def decode_audio(base64_str: str) -> torch.Tensor:
             audio_bytes = base64.b64decode(base64_str.split(",")[-1])
             with NamedTemporaryFile(delete=False, suffix=".wav") as f:
                 f.write(audio_bytes)
                 audio_tensor, sr = torchaudio.load(f.name)
                 os.unlink(f.name)
-            # Convert to mono if it's multi-channel
+            # Convert to mono (1D) if multi-channel
             if audio_tensor.shape[0] > 1:
-                audio_tensor = torch.mean(audio_tensor, dim=0, keepdim=True)
+                audio_tensor = torch.mean(audio_tensor, dim=0)
             else:
-                audio_tensor = audio_tensor.unsqueeze(0)
+                audio_tensor = audio_tensor.squeeze(0)  # Ensure 1D
             # Resample if needed
             if sr != self.generator.sample_rate:
                 audio_tensor = torchaudio.functional.resample(
                     audio_tensor, orig_freq=sr, new_freq=self.generator.sample_rate
                 )
-            # Return as 1D tensor (mono)
-            return audio_tensor.squeeze(0)
+            # Final check (optional but helpful during development)
+            assert audio_tensor.ndim == 1, "Audio must be single channel"
+            return audio_tensor
 
         speaker_a_audio = decode_audio(audio_prompt_a)
         speaker_b_audio = decode_audio(audio_prompt_b)
