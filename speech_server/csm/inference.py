@@ -5,6 +5,7 @@ import os
 from loguru import logger
 import json
 from typing import Dict, Any, Tuple, Union
+import httpx
 
 async def query_endpoint_with_status(
     data: Dict[str, Any],
