@@ -8,7 +8,7 @@ from typing import Dict, Any, Tuple, Union
 
 async def query_endpoint_with_status(
     data: Dict[str, Any],
-    endpoint: str = "/generate",
+    endpoint: str = "/predictions",
     base_url: str = "http://speech_server_csm:5006/"
 ) -> Tuple[Union[Dict[str, Any], None], int]:
     url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
