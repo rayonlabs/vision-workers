@@ -1,0 +1,82 @@
+FROM nvidia/cuda:11.8.0-devel-ubuntu20.04
+
+WORKDIR /app
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# PM2
+RUN apt-get update && apt-get install -y curl
+RUN curl -sL https://deb.nodesource.com/setup_18.x | bash -
+RUN apt-get install -y nodejs
+RUN npm install -g pm2
+
+# Installing necessary packages
+RUN apt-get update && apt-get install -y wget git
+
+# Installing Miniconda
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
+    && chmod 700 Miniconda3-latest-Linux-x86_64.sh \
+    && ./Miniconda3-latest-Linux-x86_64.sh -b \
+    && rm Miniconda3-latest-Linux-x86_64.sh
+
+ENV PATH="/root/miniconda3/bin:${PATH}"
+RUN conda create -n venv_speech python=3.10.13 -y 
+ENV PATH="/root/miniconda3/envs/venv_speech/bin:${PATH}"
+
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get -y full-upgrade \
+    && apt-get -y install python3-dev \
+    && apt-get install -y --no-install-recommends \
+    espeak-ng \
+    build-essential \
+    python3-pip \
+    apt-utils \
+    curl \
+    wget \
+    vim \
+    sudo \
+    git \
+    ffmpeg \
+    ninja-build \
+    libsm6 \
+    libxext6 \
+    python3-tk \
+    python3-dev \
+    git-lfs \
+    unzip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+
+
+COPY speech_server/ImageBind/requirements.txt /app/requirements.txt
+RUN pip install --upgrade pip setuptools==69.5.1
+
+RUN echo "source activate venv_speech" && \
+    CUDA_VERSION="11.8.0" && \
+    CUDA_VERSION_MAJOR=$(echo $CUDA_VERSION | cut -d'.' -f1) && \
+    CUDA_VERSION_MINOR=$(echo $CUDA_VERSION | cut -d'.' -f2) && \
+    CUDA_VERSION_SIMPLE="${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}.0" && \
+    conda install nvidia/label/cuda-${CUDA_VERSION_SIMPLE}::cuda-toolkit -y
+
+RUN echo "source activate venv_speech" && \
+    pip install --upgrade pip setuptools==69.5.1 && \
+    pip install -r /app/requirements.txt && \
+    pip install huggingface_hub[hf_transfer] && \
+    pip install flash-attn --no-build-isolation
+
+RUN mkdir -p /app/speech_server
+COPY speech_server/ImageBind /app/speech_server/ImageBind
+
+
+ENV APP_HOST=0.0.0.0
+ENV APP_PORT=8080
+
+USER root
+ENV DEVICE=0
+
+WORKDIR /app/speech_server/ImageBind
+RUN chmod +x /app/speech_server/ImageBind/entrypoint_imagebind.sh
+
+CMD ["bash", "-c", "cd /app/speech_server/ImageBind && ./entrypoint_imagebind.sh"]

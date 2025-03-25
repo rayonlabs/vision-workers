@@ -1,0 +1,5 @@
+service: "service:ImageBind"
+include:
+- "*.py"
+python:
+  requirements_txt: "./requirements.txt"
