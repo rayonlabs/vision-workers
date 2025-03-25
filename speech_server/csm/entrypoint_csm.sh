@@ -19,6 +19,11 @@ if [ -n "$HF_TOKEN" ]; then
     git config --global credential.helper store
     huggingface-cli login --token $HF_TOKEN --add-to-git-credential
 
+    REPO="meta-llama/Llama-3.2-1B"
+    echo "Cloning repository: $REPO"
+    git lfs install
+    git clone https://huggingface.co/$REPO
+
     nohup bentoml serve . -p 5006 > csm.log 2>&1 &
 else
     echo "HF_TOKEN not set. Skipping Huggingface login and setup"
