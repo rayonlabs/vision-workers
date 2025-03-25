@@ -4,7 +4,7 @@ from typing import List, Tuple
 import torch
 import torchaudio
 from huggingface_hub import hf_hub_download
-from models import Model
+from csm.models import Model
 from moshi.models import loaders
 from tokenizers.processors import TemplateProcessing
 from transformers import AutoTokenizer
