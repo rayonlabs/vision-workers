@@ -19,7 +19,7 @@ if [ -n "$HF_TOKEN" ]; then
     git config --global credential.helper store
     huggingface-cli login --token $HF_TOKEN --add-to-git-credential
 
-    REPO="meta-llama/Llama-3.2-1B"
+    REPO="NousResearch/Llama-3.2-1B"
     echo "Cloning repository: $REPO"
     git lfs install
     git clone https://huggingface.co/$REPO
