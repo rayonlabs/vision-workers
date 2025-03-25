@@ -10,6 +10,7 @@ import random
 import soundfile as sf
 
 from csm_custom.generator import Segment, load_csm_1b
+import constants as cst
 
 @bentoml.service()
 class CSM:
@@ -21,20 +22,20 @@ class CSM:
     async def generate(
         self,
         text_prompt_a: str = Field(
-            description="Text prompt for speaker A",
-            default="like revising for an exam I'd have to try and like keep up the momentum..."
+            description="Text caption for speaker A input audio",
+            default=cst.DEFAULT_CAPTION_A
         ),
         audio_prompt_a: str = Field(
             description="Base64 encoded audio file for speaker A",
-            default=""
+            default=cst.DEFAULT_REFERENCE_AUDIO_A
         ),
         text_prompt_b: str = Field(
-            description="Text prompt for speaker B",
-            default="like a super Mario level. Like it's very like high detail..."
+            description="Text caption for speaker B input audio",
+            default=cst.DEFAULT_CAPTION_B
         ),
         audio_prompt_b: str = Field(
             description="Base64 encoded audio file for speaker B", 
-            default=""
+            default=cst.DEFAULT_REFERENCE_AUDIO_B
         ),
         conversation: str = Field(
             description="Conversation text with alternating lines between speakers",
@@ -96,7 +97,7 @@ class CSM:
 
         full_audio = torch.cat([seg.audio for seg in generated], dim=0)
 
-        # removed till profiling performance impact
+        # removed until profiling performance impact
         # watermarked_audio, wm_sr = watermark(
         #     self.generator._watermarker,
         #     full_audio,
