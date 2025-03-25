@@ -50,5 +50,5 @@ async def csm_infer(
         logger.error(f"Error in getting enhanced response: {e}")
         logger.info(f"infer_props for enhance request: {infer_props_dict.items()}")
 
-    speech_response = await query_endpoint_with_status(payload)
+    speech_response, status_code = await query_endpoint_with_status(payload)
     return speech_response
