@@ -9,7 +9,7 @@ import httpx
 
 async def query_endpoint_with_status(
     data: Dict[str, Any],
-    endpoint: str = "/predictions",
+    endpoint: str = "/generate",
     base_url: str = "http://localhost:5006/"
 ) -> Tuple[Union[Dict[str, Any], None], int]:
     url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
