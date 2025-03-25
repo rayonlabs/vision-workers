@@ -64,13 +64,18 @@ class CSM:
                 f.write(audio_bytes)
                 audio_tensor, sr = torchaudio.load(f.name)
                 os.unlink(f.name)
-            
-            audio_tensor = audio_tensor.squeeze(0)
+            # Convert to mono if it's multi-channel
+            if audio_tensor.shape[0] > 1:
+                audio_tensor = torch.mean(audio_tensor, dim=0, keepdim=True)
+            else:
+                audio_tensor = audio_tensor.unsqueeze(0)
+            # Resample if needed
             if sr != self.generator.sample_rate:
                 audio_tensor = torchaudio.functional.resample(
                     audio_tensor, orig_freq=sr, new_freq=self.generator.sample_rate
                 )
-            return audio_tensor
+            # Return as 1D tensor (mono)
+            return audio_tensor.squeeze(0)
 
         speaker_a_audio = decode_audio(audio_prompt_a)
         speaker_b_audio = decode_audio(audio_prompt_b)
