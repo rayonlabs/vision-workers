@@ -3,6 +3,7 @@
 - [ X ] verify seed functionality in CSM server 
 
 - [] integrate CSM with nineteen code 
+- [] add retry mechanism between container & BentoML interface (/healthz endpoint is deprecated though) 
 
 - [] verify checking reliability with ImageBind 
     - [] Add Imagebind server once CSM prototype done 
