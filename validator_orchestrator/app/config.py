@@ -49,8 +49,12 @@ checking_server_configs: list[CheckingServerConfig] = [
         port_internal=6919,
         volumes={
             "CSM": "/root/.local/share/tts",
+            "HF": "/app/cache"
         },
-        env_vars={},
+        env_vars={
+            "HF_HOME": "/app/cache",
+            "HF_HUB_CACHE": "/app/cache/hub"
+        },
         network=shared_network,
         external_port=6919
     ),
