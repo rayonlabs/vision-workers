@@ -64,7 +64,7 @@ class TextToSpeechBase(BaseModel):
     )
     seed: int = Field(
         description="Random seed (use -1 for random)",
-        default=-1
+        default=1
     )
     unconditional_keys: list[str] = Field(
         description="List of conditioning keys to make unconditional",
