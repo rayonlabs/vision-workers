@@ -1,0 +1,5 @@
+service: "service:ZonosTTS"
+include:
+- "*.py"
+python:
+  requirements_txt: "./requirements.txt"
