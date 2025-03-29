@@ -73,6 +73,10 @@ COPY speech_server/zonos /app/speech_server/zonos
 
 WORKDIR /app/speech_server/zonos
 
+RUN git clone https://github.com/Zyphra/Zonos.git@bc40d98e1e1ab54fc65c483be127a90e3c7c0645 && cd Zonos && pip install uv && \
+    pip install -e . && \
+    pip install --no-build-isolation -e .[compile]
+
 ENV APP_HOST=0.0.0.0
 ENV APP_PORT=8080
 
