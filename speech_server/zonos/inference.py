@@ -39,9 +39,9 @@ async def query_endpoint_with_status(
             logger.error(f"HTTP error occurred: {e}")
             return None, status_code
 
-async def csm_infer(
-    infer_props: base_model.CSMIncoming,
-) -> base_model.CSMResponseBody:
+async def zonos_infer(
+    infer_props: base_model.ZonosIncoming,
+) -> base_model.ZonosIncoming:
     payload = None 
     try:
         infer_props_dict = json.loads(infer_props.json())
