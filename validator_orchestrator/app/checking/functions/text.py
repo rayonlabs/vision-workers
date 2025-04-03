@@ -75,7 +75,7 @@ async def _tokenize_and_detokenize(input_payload: dict, model_name: str, eos_tok
         tokenize_response.raise_for_status()
         token_list: list[int] = tokenize_response.json()["tokens"]
 
-        if ("llama-3" in model_name.lower() or 'deepseek-r1' in model_name.lower() or 'qwq-32b' in model_name.lower()) and not add_generation_prompt:
+        if ("llama-3" in model_name.lower() or 'deepseek-r1' in model_name.lower() or 'qwq-32b' in model_name.lower() or 'qwen2.5-7b' in model_name.lower()) and not add_generation_prompt:
             last_eot_index = max((index for index, value in enumerate(token_list) if value == eos_token_id), default=None)
             if last_eot_index is not None:
                 token_list = token_list[:last_eot_index]
@@ -103,6 +103,7 @@ async def make_api_call(
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(endpoint, json=payload)
         return response.json()
+
 
 async def query_endpoint_with_status(
     endpoint: str,
@@ -136,6 +137,7 @@ async def query_endpoint_with_status(
             logger.error(f"HTTP error occurred: {e}")
             return None, status_code
 
+
 async def _process_think_tags_deepseek(prompt: str, messages: list[dict]) -> str:
     assistant_message = next((m for m in messages if m['role'] == 'assistant'), None)
     if not assistant_message:
@@ -154,6 +156,7 @@ async def _process_think_tags_deepseek(prompt: str, messages: list[dict]) -> str
     insert_pos = prompt.find(assistant_token) + len(assistant_token)
     
     return prompt[:insert_pos] + think_content + prompt[insert_pos:]
+
 
 async def calculate_distance_for_token(
     task_config: models.OrchestratorServerConfig,
