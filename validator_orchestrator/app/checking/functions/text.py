@@ -75,7 +75,7 @@ async def _tokenize_and_detokenize(input_payload: dict, model_name: str, eos_tok
         tokenize_response.raise_for_status()
         token_list: list[int] = tokenize_response.json()["tokens"]
 
-        if ("llama-3" in model_name.lower() or 'deepseek-r1' in model_name.lower() or 'qwq-32b' in model_name.lower()) and not add_generation_prompt:
+        if ("llama-3" in model_name.lower() or 'deepseek-r1' in model_name.lower() or 'qwq-32b' in model_name.lower() or 'qwen2.5-7b' in model_name.lower()) and not add_generation_prompt:
             last_eot_index = max((index for index, value in enumerate(token_list) if value == eos_token_id), default=None)
             if last_eot_index is not None:
                 token_list = token_list[:last_eot_index]
@@ -103,6 +103,7 @@ async def make_api_call(
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(endpoint, json=payload)
         return response.json()
+
 
 async def query_endpoint_with_status(
     endpoint: str,
@@ -136,6 +137,7 @@ async def query_endpoint_with_status(
             logger.error(f"HTTP error occurred: {e}")
             return None, status_code
 
+
 async def _process_think_tags_deepseek(prompt: str, messages: list[dict]) -> str:
     assistant_message = next((m for m in messages if m['role'] == 'assistant'), None)
     if not assistant_message:
@@ -154,6 +156,7 @@ async def _process_think_tags_deepseek(prompt: str, messages: list[dict]) -> str
     insert_pos = prompt.find(assistant_token) + len(assistant_token)
     
     return prompt[:insert_pos] + think_content + prompt[insert_pos:]
+
 
 async def calculate_distance_for_token(
     task_config: models.OrchestratorServerConfig,
@@ -181,10 +184,9 @@ async def calculate_distance_for_token(
         "prompt": prompt,
         "model": task_config.load_model_config["model"],
         "temperature": llm_request.temperature,
-        "top_k": llm_request.top_k,
         "top_p": 1,
         "max_tokens": 1,
-        "logprobs": llm_request.number_of_logprobs,
+        "logprobs": 20,
         "add_special_tokens": False
     }
     try:
@@ -195,6 +197,11 @@ async def calculate_distance_for_token(
     except httpx.RequestError as e:
         logger.error(f"Request failed in calculate_distance_for_token: {e}")
         return 1
+
+    logger.info(f"completion payload: \n{json.dumps(completions_payload, indent=2)}\n")
+    logger.info(f"validator_checking_response: \n{json.dumps(validator_checking_response, indent=2)}\n")
+    logger.info(f"chat_responses: \n{json.dumps([response.dict() for response in chat_responses[max(0, index-5):index+3]], indent=2)}\n")
+    logger.info(f"focus token in response: \n{json.dumps(chat_responses[index].dict(), indent=2)}\n")
 
     text = chat_responses[index].content
     validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["top_logprobs"][0]
@@ -296,6 +303,8 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         "add_special_tokens": False
     }
 
+    logger.info(f"completions_payload for checks: \n{json.dumps(completions_payload, indent=2)}\n")
+
     try:
         result = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
     except (httpx.RequestError, json.JSONDecodeError) as e:
@@ -312,6 +321,8 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     failed_tokens_idx = []
     failed_tokens_details = []
 
+    max_acceptable_rank = 10 if payload["temperature"] <= 0.5 else int(10 / (1.03 - payload["temperature"]))
+
     for idx, response_token, logprobs in zip(range(len(all_tokens[num_input_tokens:])), all_tokens[num_input_tokens:], prompt_logprobs):
         # Just a helper for nicer printing
         nice_logprobs = json.dumps(logprobs, indent=2, sort_keys=True, ensure_ascii=False)
@@ -324,7 +335,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
             logprob = logprobs[str(response_token)]["logprob"]
             rank = logprobs[str(response_token)]["rank"]
 
-            if rank < 10 and logprob > float("-inf"):
+            if rank <  max_acceptable_rank and logprob > float("-inf"):
                 logger.info(f"Token {response_token} {additional_log} in logprobs with good behaviour; rank: {rank}, logprob: {logprob} ✅")
             else:
                 logger.error(f"Token {response_token} {additional_log} in logprobs with bad behaviour; rank: {rank}, logprob: {logprob} ❌")
@@ -386,7 +397,6 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     # Prepare request for token validation
     payload["starting_assistant_message"] = True
     payload["number_of_logprobs"] = 5
-    payload["top_k"] = 5
 
     if is_completions_payload:
         llm_request = models.CompletionRequestModel(**payload)
