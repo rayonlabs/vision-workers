@@ -186,7 +186,7 @@ async def calculate_distance_for_token(
         "temperature": llm_request.temperature,
         "top_p": 1,
         "max_tokens": 1,
-        "logprobs": 50,
+        "logprobs": 20,
         "add_special_tokens": False
     }
     try:
