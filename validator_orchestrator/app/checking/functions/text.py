@@ -303,6 +303,8 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         "add_special_tokens": False
     }
 
+    logger.info(f"completions_payload for checks: \n{json.dumps(completions_payload, indent=2)}\n")
+
     try:
         result = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
     except (httpx.RequestError, json.JSONDecodeError) as e:
@@ -311,8 +313,6 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         return 0.9876
 
     prompt_logprobs = result["choices"][0]["prompt_logprobs"][num_input_tokens:]
-
-    
 
     bad_token_found = False
 
