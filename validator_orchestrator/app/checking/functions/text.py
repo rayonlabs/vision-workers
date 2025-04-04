@@ -184,7 +184,6 @@ async def calculate_distance_for_token(
         "prompt": prompt,
         "model": task_config.load_model_config["model"],
         "temperature": llm_request.temperature,
-        "top_k": llm_request.top_k,
         "top_p": 1,
         "max_tokens": 1,
         "logprobs": 10,
@@ -394,7 +393,6 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     # Prepare request for token validation
     payload["starting_assistant_message"] = True
     payload["number_of_logprobs"] = 5
-    payload["top_k"] = 5
 
     if is_completions_payload:
         llm_request = models.CompletionRequestModel(**payload)
