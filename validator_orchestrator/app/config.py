@@ -12,7 +12,6 @@ class CheckingServerConfig(BaseModel):
     port: int
     volumes: Dict[str, str]  # volue name, mount path
     env_vars: Dict[str, str]
-    server_params: Dict[str, str]
     network: str
     external_port: int
 
@@ -31,9 +30,6 @@ checking_server_configs: list[CheckingServerConfig] = [
             "HF_HOME": "/app/cache",
             "HF_HUB_CACHE": "/app/cache/hub"
         },
-        server_params = {
-            "max-logprobs": "50"
-        },
         network=shared_network,
         external_port=6919,
     ),
@@ -43,7 +39,6 @@ checking_server_configs: list[CheckingServerConfig] = [
         port=6919,
         volumes={"COMFY": "/app/image_server/ComfyUI"},
         env_vars={},
-        server_params={},
         network=shared_network,
         external_port=6919,
     ),
