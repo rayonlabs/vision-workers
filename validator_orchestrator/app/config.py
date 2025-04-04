@@ -33,7 +33,7 @@ checking_server_configs: list[CheckingServerConfig] = [
         },
         server_params = {
             "max-logprobs": "50"
-        }
+        },
         network=shared_network,
         external_port=6919,
     ),
