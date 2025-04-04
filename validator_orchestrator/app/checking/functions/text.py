@@ -187,7 +187,7 @@ async def calculate_distance_for_token(
         "top_k": llm_request.top_k,
         "top_p": 1,
         "max_tokens": 1,
-        "logprobs": 5,
+        "logprobs": 10,
         "add_special_tokens": False
     }
     try:
@@ -201,7 +201,7 @@ async def calculate_distance_for_token(
 
     logger.info(f"completion payload: \n{json.dumps(completions_payload, indent=2)}\n")
     logger.info(f"validator_checking_response: \n{json.dumps(validator_checking_response, indent=2)}\n")
-    logger.info(f"chat_responses: \n{json.dumps([response.dict() for response in chat_responses[:index+3]], indent=2)}\n")
+    logger.info(f"chat_responses: \n{json.dumps([response.dict() for response in chat_responses[max(0, index-5):index+3]], indent=2)}\n")
     logger.info(f"focus token in response: \n{json.dumps(chat_responses[index].dict(), indent=2)}\n")
 
     text = chat_responses[index].content
