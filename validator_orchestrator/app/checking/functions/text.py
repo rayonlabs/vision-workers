@@ -312,12 +312,16 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
 
     prompt_logprobs = result["choices"][0]["prompt_logprobs"][num_input_tokens:]
 
+    
+
     bad_token_found = False
 
     fail_reason = ""
 
     failed_tokens_idx = []
     failed_tokens_details = []
+
+    max_acceptable_rank = 10 if payload["temperature"] <= 0.5 else 20
 
     for idx, response_token, logprobs in zip(range(len(all_tokens[num_input_tokens:])), all_tokens[num_input_tokens:], prompt_logprobs):
         # Just a helper for nicer printing
@@ -331,7 +335,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
             logprob = logprobs[str(response_token)]["logprob"]
             rank = logprobs[str(response_token)]["rank"]
 
-            if rank < 10 and logprob > float("-inf"):
+            if rank <  max_acceptable_rank and logprob > float("-inf"):
                 logger.info(f"Token {response_token} {additional_log} in logprobs with good behaviour; rank: {rank}, logprob: {logprob} ✅")
             else:
                 logger.error(f"Token {response_token} {additional_log} in logprobs with bad behaviour; rank: {rank}, logprob: {logprob} ❌")
