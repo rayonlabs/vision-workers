@@ -201,8 +201,8 @@ async def calculate_distance_for_token(
 
     logger.info(f"completion payload: \n{json.dumps(completions_payload, indent=2)}\n")
     logger.info(f"validator_checking_response: \n{json.dumps(validator_checking_response, indent=2)}\n")
-    logger.info(f"chat_responses: \n{json.dumps(chat_responses[:index+3], indent=2)}\n")
-    logger.info(f"focus token in response: \n{json.dumps(chat_responses[index], indent=2)}\n")
+    logger.info(f"chat_responses: \n{json.dumps([response.dict() for response in chat_responses[:index+3]], indent=2)}\n")
+    logger.info(f"focus token in response: \n{json.dumps(chat_responses[index].dict(), indent=2)}\n")
 
     text = chat_responses[index].content
     validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["top_logprobs"][0]
