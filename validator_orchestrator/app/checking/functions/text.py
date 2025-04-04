@@ -187,7 +187,7 @@ async def calculate_distance_for_token(
         "top_k": llm_request.top_k,
         "top_p": 1,
         "max_tokens": 1,
-        "logprobs": llm_request.number_of_logprobs,
+        "logprobs": 5,
         "add_special_tokens": False
     }
     try:
@@ -198,6 +198,9 @@ async def calculate_distance_for_token(
     except httpx.RequestError as e:
         logger.error(f"Request failed in calculate_distance_for_token: {e}")
         return 1
+
+    logger.info(f"completion payload: \n{json.dumps(completions_payload, indent=2)}\n")
+    logger.info(f"validator_checking_response: \n{json.dumps(validator_checking_response, indent=2)}\n")
 
     text = chat_responses[index].content
     validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["top_logprobs"][0]
