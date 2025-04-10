@@ -441,3 +441,209 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         return 0
     score = _score_average_distance(average_distance)
     return score
+
+
+
+
+async def check_vlm_result(result: models.QueryResult, payload: dict, task_config: models.OrchestratorServerConfig) -> Union[float, None]:
+    # check fail
+    if result.formatted_response is None:
+        miner_status_code = result.status_code
+        _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
+        logger.info(f"miner status code: {miner_status_code} - vali status code : {vali_status_code}")
+        if str(vali_status_code[0]) == str(miner_status_code[0]):
+            return 1
+        else:
+            return -3
+    
+    formatted_response = json.loads(result.formatted_response) if isinstance(result.formatted_response, str) else result.formatted_response
+    eos_token_id = task_config.load_model_config.get("eos_token_id", 128009)
+
+    # Extract messages & logprobs from the response
+    messages: list[models.MessageResponse] = []
+    for idx, response in enumerate(formatted_response):
+        try:
+            message = _extract_chat_message(idx, response)
+
+            if message is not None:
+                messages.append(message)
+        except Exception as e:
+            logger.error(f"Error with logprob: {e}. Response: {response}")
+            logger.exception(e)
+            return 0  # Important to return 0 as this is a critical error
+
+    if not messages:
+        logger.error("No valid messages in response.")
+        logger.exception(formatted_response)
+        return 0.0
+
+    if len(messages) > payload["max_tokens"]:
+        logger.error("Number of messages is greater than max_tokens, skipping logprob check, returning 0")
+        return 0.0
+
+    full_response_content = "".join([message.content for message in messages])
+    number_of_output_tokens = len(messages)
+
+    input_chat_content = payload[MESSAGES_KEY]
+    # Make sure the last token is eos token where necessary, so we can check it with prompt logprobs
+    if number_of_output_tokens != payload["max_tokens"] and full_response_content[-1] != eos_token_id:
+        full_response_content.append(eos_token_id)
+
+    input_chat_content_w_response = input_chat_content.copy()
+    input_chat_content_w_response.append({"role": "assistant", "content": full_response_content})
+
+    # Now get the prompt logprobs from completions and check they are all correct
+    # TODO: in future if upgrading from vllm 0.6.3, remember to set `add_special_tokens = False` due to "second bos" issue
+    chat_completions_payload = {
+        "messages": input_chat_content_w_response,
+        "model": task_config.load_model_config["model"],
+        "temperature": payload["temperature"],
+        "max_tokens": 1,
+        "add_generation_prompt": False,
+        "continue_final_message": True,
+        "prompt_logprobs": 10,
+        "add_special_tokens": False
+    }
+
+    logger.info(f"chat_completions_payload for checks: \n{json.dumps(chat_completions_payload, indent=2)}\n")
+
+    try:
+        result = await make_api_call(chat_completions_payload, endpoint=f"{BASE_URL}/v1/chat/completions")
+    except (httpx.RequestError, json.JSONDecodeError) as e:
+        logger.exception(e)
+        logger.error(f"API call failed: {e}")
+        return 0.9876
+    
+
+
+    #TODO: calculate num_input_tokens with /chat/completions input that also has image input (which gets ignored by /tokenize endpoint, a bit tricky yea)
+
+    prompt_logprobs = result["choices"][0]["prompt_logprobs"][num_input_tokens:]
+
+    bad_token_found = False
+
+    fail_reason = ""
+
+    failed_tokens_idx = []
+    failed_tokens_details = []
+
+    max_acceptable_rank = 10 if payload["temperature"] <= 0.5 else int(10 / (1.03 - payload["temperature"]))
+
+    for idx, response_token, logprobs in zip(range(len(all_tokens[num_input_tokens:])), all_tokens[num_input_tokens:], prompt_logprobs):
+        # Just a helper for nicer printing
+        nice_logprobs = json.dumps(logprobs, indent=2, sort_keys=True, ensure_ascii=False)
+
+        # The edge case here is when the messages didn't include the end of token
+        # So sometimes we don't have a message for the last token
+        additional_log = f" (decoded: '{messages[idx].content}', logprob: {messages[idx].logprob})" if idx <= len(messages) - 1 else ""
+
+        if str(response_token) in logprobs:
+            logprob = logprobs[str(response_token)]["logprob"]
+            rank = logprobs[str(response_token)]["rank"]
+
+            if rank <  max_acceptable_rank and logprob > float("-inf"):
+                logger.info(f"Token {response_token} {additional_log} in logprobs with good behaviour; rank: {rank}, logprob: {logprob} ✅")
+            else:
+                logger.error(f"Token {response_token} {additional_log} in logprobs with bad behaviour; rank: {rank}, logprob: {logprob} ❌")
+                failed_tokens_idx.append(idx)
+                failed_tokens_details.append((response_token, rank, logprob, additional_log))
+
+                if len(failed_tokens_idx) > 5:
+                    failed_tokens_details = json.dumps(failed_tokens_details, indent=2, sort_keys=True, ensure_ascii=False)
+                    fail_reason = f"Too many bad tokens found ('response_token', 'rank', 'logprob', 'additional_log'):\n{failed_tokens_details}"
+                    bad_token_found = True
+                    break
+        else:
+            logger.error(f"Token {response_token} {additional_log} not found in logprobs :(")
+            bad_token_found = True
+            break
+
+        # If you could've stopped, why didnt you?
+        if str(eos_token_id) in logprobs and str(response_token) != str(eos_token_id):
+            logprob = logprobs[str(eos_token_id)]["logprob"]
+            response_logprob = logprobs[str(response_token)]["logprob"]
+            if logprob > float("-inf") and math.exp(logprob) / math.exp(response_logprob) > 100:
+                fail_reason = "You really went out your way to avoid stopping!"
+                bad_token_found = True
+                break
+
+    if bad_token_found:
+        # TODO: Make a nice message
+        logger.error(f"Bad token (s) found at indexes {failed_tokens_idx}." f" Prompt logprobs: {nice_logprobs}" f" Reason: {fail_reason}")
+        return 0.0
+
+    logger.info("All tokens found in prompt_logprobs! ✅")
+
+    # Now lets do some fine grained checking
+
+    if len(messages) == 1:
+        indices_to_check = [0]
+    else:
+        # Always check first & last
+        indices_to_check = [0, len(messages) - 1] 
+
+        if len(failed_tokens_idx)>0:
+            indices_to_check += failed_tokens_idx[:3]
+
+        remaining_indexes = list(set(list(set(range(0, len(messages))) - set(indices_to_check))))
+
+        number_of_additional_indices_to_check = min(5 - len(indices_to_check), len(messages) - 2) 
+        additional_indices_to_check = random.sample(
+            remaining_indexes,
+            number_of_additional_indices_to_check,
+        )
+        indices_to_check.extend(additional_indices_to_check)
+
+    logger.info(f"failed token indexes : {failed_tokens_idx}")
+    logger.info(f"logprobs indexes to check : {indices_to_check}")
+
+    total_distance = 0
+    checks = 0
+
+    # Prepare request for token validation
+    payload["starting_assistant_message"] = True
+    payload["number_of_logprobs"] = 5
+
+    if is_completions_payload:
+        llm_request = models.CompletionRequestModel(**payload)
+        llm_request.max_tokens = 1
+    else:
+        llm_request = models.ChatRequestModel(**payload)
+        llm_request.max_tokens = 1
+
+    for i, index in enumerate(indices_to_check):
+        if checks >= 5:
+            break
+
+        if is_completions_payload:
+            text_to_inject_for_checking = "".join([i.content for i in messages[:index]])
+            llm_request.prompt += text_to_inject_for_checking
+            starting_assistant_message = False
+        else:
+            starting_assistant_message = i == 0
+            if index > 0:
+                text_to_inject_into_assistant_message = "".join([i.content for i in messages[:index]])
+                llm_request.messages.append(
+                    models.Message(
+                        **{
+                            "role": "assistant",
+                            "content": text_to_inject_into_assistant_message,
+                        }
+                    )
+                )
+        logger.info(f"index : {index} - token : {messages[index].content}")
+        distance = await calculate_distance_for_token(task_config, llm_request, messages, index, starting_assistant_message)
+        checks += 1
+        total_distance += distance
+        if index != 0 and is_completions_payload:
+            llm_request.prompt = llm_request.prompt[: (len(llm_request.prompt) - len(text_to_inject_for_checking))]
+        elif index != 0 and not is_completions_payload:
+            llm_request.messages = llm_request.messages[:-1]
+
+    try:
+        average_distance = total_distance / checks
+    except Exception as e:
+        logger.error(f"Error with average distance: {e}. Total distance: {total_distance}. Checks: {checks}")
+        return 0
+    score = _score_average_distance(average_distance)
+    return score
