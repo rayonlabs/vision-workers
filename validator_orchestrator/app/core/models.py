@@ -29,7 +29,7 @@ class ServerType(Enum):
 
 
 class ProdDockerImages(Enum):
-    LLM = "vllm/vllm-openai:v0.8.3.post1"
+    LLM = "vllm/vllm-openai:v0.8.3"
     IMAGE = "nineteenai/sn19:image_server-latest"
 
 
