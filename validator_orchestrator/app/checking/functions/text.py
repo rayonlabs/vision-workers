@@ -198,7 +198,7 @@ async def calculate_distance_for_token_vlm(
     text = chat_responses[index].content
 
     #updated acc to output from /chat/completions with VLLM_USE_V1=0
-    validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["content"][0]["top_logprobs"][0]
+    validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["content"][0]["top_logprobs"]
 
     # find entry in top_logprobs where `token` == text, updated acc to output from /chat/completions with VLLM_USE_V1=0
     found_entry = next((entry for entry in validator_log_probs_for_token if entry["token"] == text), None)
