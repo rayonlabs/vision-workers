@@ -200,7 +200,9 @@ async def calculate_distance_for_token_vlm(
     #updated acc to output from /chat/completions with VLLM_USE_V1=0
     validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["content"][0]["top_logprobs"][0]
 
-    if text not in validator_log_probs_for_token:
+    # find entry in top_logprobs where `token` == text, updated acc to output from /chat/completions with VLLM_USE_V1=0
+    found_entry = next((entry for entry in validator_log_probs_for_token if entry["token"] == text), None)
+    if not found_entry:
         logger.info(f"token: {text} - not found in vali logprobs")
         logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
         return 1
