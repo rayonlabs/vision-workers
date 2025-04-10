@@ -177,8 +177,8 @@ async def calculate_distance_for_token_vlm(
         "max_tokens": 1,
         "logprobs": True,
         "top_logprobs": 20,
-        "add_generation_prompt": False,
-        "continue_final_message": True,
+        "add_generation_prompt": starting_assistant_message,
+        "continue_final_message": not starting_assistant_message,
         "add_special_tokens": False
     }
     try:
@@ -196,7 +196,9 @@ async def calculate_distance_for_token_vlm(
     logger.info(f"focus token in response: \n{json.dumps(chat_responses[index].dict(), indent=2)}\n")
 
     text = chat_responses[index].content
-    validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["top_logprobs"][0]
+
+    #updated acc to output from /chat/completions with VLLM_USE_V1=0
+    validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["content"][0]["top_logprobs"][0]
 
     if text not in validator_log_probs_for_token:
         logger.info(f"token: {text} - not found in vali logprobs")
