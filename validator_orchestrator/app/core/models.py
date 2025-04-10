@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Dict, List, Optional, Any, Union
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 from datetime import datetime
 
 AxonScores = Dict[int, float]
@@ -71,7 +71,11 @@ class CheckResultsRequest(BaseModel):
 
 class ContentItem(BaseModel):
     type: str
-    text: str
+    text: Union[str, None] = None  # Allow text to be optional
+    image_url: Union[HttpUrl, None] = None  # Allow image_url to be optional
+
+    class Config:
+        min_anystr_length = 1  # Optional: enforce non-empty strings when provided
 
 class Message(BaseModel):
     role: str
