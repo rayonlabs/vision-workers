@@ -71,7 +71,7 @@ class CheckResultsRequest(BaseModel):
 
 class Message(BaseModel):
     role: str
-    content: str
+    content: Union[str, list]
 
 
 class MessageResponse(BaseModel):
