@@ -87,7 +87,7 @@ class MessageResponse(BaseModel):
 
 
 class ChatRequestModel(BaseModel):
-    messages: list[Message]
+    messages: List[Message]
     seed: int
     temperature: float
     max_tokens: int
