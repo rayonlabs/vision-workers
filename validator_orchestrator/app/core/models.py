@@ -69,10 +69,13 @@ class CheckResultsRequest(BaseModel):
     payload: dict
 
 
+class ContentItem(BaseModel):
+    type: str
+    text: str
+
 class Message(BaseModel):
     role: str
-    content: Union[str, list]
-
+    content: Union[str, List[ContentItem]]
 
 class MessageResponse(BaseModel):
     content: str
