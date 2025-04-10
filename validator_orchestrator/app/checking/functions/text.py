@@ -158,6 +158,58 @@ async def _process_think_tags_deepseek(prompt: str, messages: list[dict]) -> str
     return prompt[:insert_pos] + think_content + prompt[insert_pos:]
 
 
+async def calculate_distance_for_token_vlm(
+    task_config: models.OrchestratorServerConfig,
+    llm_request: models.ChatRequestModel,
+    chat_responses: List[models.MessageResponse],
+    index: int,
+    starting_assistant_message: bool,
+) -> float:
+
+    messages = [elm.model_dump() for elm in llm_request.messages]
+        
+    # TODO: in future if upgrading from vllm 0.6.3, remember to set `add_special_tokens = False` due to "second bos" issue
+    chat_completions_payload = {
+        "messages": messages,
+        "model": task_config.load_model_config["model"],
+        "temperature": llm_request.temperature,
+        "top_p": 1,
+        "max_tokens": 1,
+        "logprobs": True,
+        "top_logprobs": 20,
+        "add_generation_prompt": False,
+        "continue_final_message": True,
+        "add_special_tokens": False
+    }
+    try:
+        validator_checking_response = await make_api_call(chat_completions_payload, endpoint=f"{BASE_URL}/v1/chat/completions")
+    except json.JSONDecodeError as e:
+        logger.error(f"Error decoding JSON in calculate_distance_for_token_vlm: {e}. Response: {validator_checking_response}")
+        return 1
+    except httpx.RequestError as e:
+        logger.error(f"Request failed in calculate_distance_for_token_vlm: {e}")
+        return 1
+
+    logger.info(f"chat completion payload: \n{json.dumps(chat_completions_payload, indent=2)}\n")
+    logger.info(f"validator_checking_response: \n{json.dumps(validator_checking_response, indent=2)}\n")
+    logger.info(f"chat_responses: \n{json.dumps([response.dict() for response in chat_responses[max(0, index-5):index+3]], indent=2)}\n")
+    logger.info(f"focus token in response: \n{json.dumps(chat_responses[index].dict(), indent=2)}\n")
+
+    text = chat_responses[index].content
+    validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["top_logprobs"][0]
+
+    if text not in validator_log_probs_for_token:
+        logger.info(f"token: {text} - not found in vali logprobs")
+        logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
+        return 1
+    else:
+        distance = min(abs(math.exp(validator_log_probs_for_token[text]) - math.exp(chat_responses[index].logprob)), 1)
+        logger.info(f"token: {text} - logprob : {chat_responses[index].logprob}")
+        logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
+
+    return distance
+
+
 async def calculate_distance_for_token(
     task_config: models.OrchestratorServerConfig,
     llm_request: Union[models.ChatRequestModel, models.CompletionRequestModel],
@@ -642,7 +694,7 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
                 )
             )
         logger.info(f"index : {index} - token : {messages[index].content}")
-        distance = await calculate_distance_for_token(task_config, llm_request, messages, index, starting_assistant_message)
+        distance = await calculate_distance_for_token_vlm(task_config, llm_request, messages, index, starting_assistant_message)
         checks += 1
         total_distance += distance
         llm_request.messages = llm_request.messages[:-1]
