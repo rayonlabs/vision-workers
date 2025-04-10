@@ -486,9 +486,11 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
     number_of_output_tokens = len(messages)
 
     input_chat_content = payload[MESSAGES_KEY]
+
+    eos_token = await _detokenize([eos_token_id], task_config.load_model_config["model"])
     # Make sure the last token is eos token where necessary, so we can check it with prompt logprobs
-    if number_of_output_tokens != payload["max_tokens"] and full_response_content[-1] != eos_token_id:
-        full_response_content.append(eos_token_id)
+    if number_of_output_tokens != payload["max_tokens"] and full_response_content[-len(eos_token):] != eos_token:
+        full_response_content += eos_token
 
     input_chat_content_w_response = input_chat_content.copy()
     input_chat_content_w_response.append({"role": "assistant", "content": full_response_content})
