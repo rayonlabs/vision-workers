@@ -52,12 +52,13 @@ class OrchestratorServerConfig(BaseModel):
                 "tokenizer": "tau-vision/llama-tokenizer-fix",
                 "max_model_len": 16000,
                 "gpu_memory_utilization": 0.6,
-                "eos_token_id": 128009
+                "eos_token_id": 128009,
+                "assistant_token_id": 200019,
             },
             None,
         ]
     )
-    checking_function: str = Field(examples=["check_text_result", "check_image_result"])
+    checking_function: str = Field(examples=["check_text_result", "check_image_result", "check_vlm_result"])
     task: str = Field(examples=["chat-llama-3-1-8b"])
     endpoint: str = Field(examples=["/generate_text"])
 

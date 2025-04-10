@@ -458,6 +458,7 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
     
     formatted_response = json.loads(result.formatted_response) if isinstance(result.formatted_response, str) else result.formatted_response
     eos_token_id = task_config.load_model_config.get("eos_token_id", 128009)
+    assistant_token_id = task_config.load_model_config.get("assistant_token_id", 200019)
 
     # Extract messages & logprobs from the response
     messages: list[models.MessageResponse] = []
@@ -518,7 +519,20 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
 
     #TODO: calculate num_input_tokens with /chat/completions input that also has image input (which gets ignored by /tokenize endpoint, a bit tricky yea)
 
-    prompt_logprobs = result["choices"][0]["prompt_logprobs"][num_input_tokens:]
+    # Get the last occurance of the assistant token in the prompt logprobs
+    last_assistant_index = None
+    for i in range(len(prompt_logprobs) - 1, -1, -1):
+        d = prompt_logprobs[i]
+        if str(assistant_token_id) in d and d[str(assistant_token_id)]["rank"] == 1:
+            last_assistant_index = i
+            break
+
+    try:
+        assert index is not None
+    except AssertionError:
+        logger.error(f"Assistant token not found in prompt logprobs of miner : {prompt_logprobs}")
+        return 0    
+    prompt_logprobs = result["choices"][0]["prompt_logprobs"][last_assistant_index:]
 
     bad_token_found = False
 
@@ -529,7 +543,7 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
 
     max_acceptable_rank = 10 if payload["temperature"] <= 0.5 else int(10 / (1.03 - payload["temperature"]))
 
-    for idx, response_token, logprobs in zip(range(len(all_tokens[num_input_tokens:])), all_tokens[num_input_tokens:], prompt_logprobs):
+    for idx, response_obj, logprobs in zip(range(len(messages)), messages, prompt_logprobs):
         # Just a helper for nicer printing
         nice_logprobs = json.dumps(logprobs, indent=2, sort_keys=True, ensure_ascii=False)
 
@@ -537,16 +551,18 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         # So sometimes we don't have a message for the last token
         additional_log = f" (decoded: '{messages[idx].content}', logprob: {messages[idx].logprob})" if idx <= len(messages) - 1 else ""
 
-        if str(response_token) in logprobs:
-            logprob = logprobs[str(response_token)]["logprob"]
-            rank = logprobs[str(response_token)]["rank"]
+        # Check if the decoded token (miner output) is in the corresponding prompt logprobs
+        found_key = next((token_id for d in prompt_logprobs for token_id, info in d.items() if info["decoded_token"] == response_obj.content), None)
 
+        if found_key:
+            logprob = logprobs[found_key]["logprob"]
+            rank = logprobs[found_key]["rank"]
             if rank <  max_acceptable_rank and logprob > float("-inf"):
-                logger.info(f"Token {response_token} {additional_log} in logprobs with good behaviour; rank: {rank}, logprob: {logprob} ✅")
+                logger.info(f"Token {response_obj.content} {additional_log} in logprobs with good behaviour; rank: {rank}, logprob: {logprob} ✅")
             else:
-                logger.error(f"Token {response_token} {additional_log} in logprobs with bad behaviour; rank: {rank}, logprob: {logprob} ❌")
+                logger.error(f"Token {response_obj.content} {additional_log} in logprobs with bad behaviour; rank: {rank}, logprob: {logprob} ❌")
                 failed_tokens_idx.append(idx)
-                failed_tokens_details.append((response_token, rank, logprob, additional_log))
+                failed_tokens_details.append((response_obj.content, rank, logprob, additional_log))
 
                 if len(failed_tokens_idx) > 5:
                     failed_tokens_details = json.dumps(failed_tokens_details, indent=2, sort_keys=True, ensure_ascii=False)
@@ -554,14 +570,14 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
                     bad_token_found = True
                     break
         else:
-            logger.error(f"Token {response_token} {additional_log} not found in logprobs :(")
+            logger.error(f"Token {response_obj.content} {additional_log} not found in logprobs :(")
             bad_token_found = True
             break
 
         # If you could've stopped, why didnt you?
-        if str(eos_token_id) in logprobs and str(response_token) != str(eos_token_id):
+        if str(eos_token_id) in logprobs and response_obj.content != str(eos_token_id):
             logprob = logprobs[str(eos_token_id)]["logprob"]
-            response_logprob = logprobs[str(response_token)]["logprob"]
+            response_logprob = logprobs[found_key]["logprob"]
             if logprob > float("-inf") and math.exp(logprob) / math.exp(response_logprob) > 100:
                 fail_reason = "You really went out your way to avoid stopping!"
                 bad_token_found = True
@@ -604,41 +620,29 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
     payload["starting_assistant_message"] = True
     payload["number_of_logprobs"] = 5
 
-    if is_completions_payload:
-        llm_request = models.CompletionRequestModel(**payload)
-        llm_request.max_tokens = 1
-    else:
-        llm_request = models.ChatRequestModel(**payload)
-        llm_request.max_tokens = 1
+
+    llm_request = models.ChatRequestModel(**payload)
+    llm_request.max_tokens = 1
 
     for i, index in enumerate(indices_to_check):
         if checks >= 5:
             break
-
-        if is_completions_payload:
-            text_to_inject_for_checking = "".join([i.content for i in messages[:index]])
-            llm_request.prompt += text_to_inject_for_checking
-            starting_assistant_message = False
-        else:
-            starting_assistant_message = i == 0
-            if index > 0:
-                text_to_inject_into_assistant_message = "".join([i.content for i in messages[:index]])
-                llm_request.messages.append(
-                    models.Message(
-                        **{
-                            "role": "assistant",
-                            "content": text_to_inject_into_assistant_message,
-                        }
-                    )
+        starting_assistant_message = i == 0
+        if index > 0:
+            text_to_inject_into_assistant_message = "".join([i.content for i in messages[:index]])
+            llm_request.messages.append(
+                models.Message(
+                    **{
+                        "role": "assistant",
+                        "content": text_to_inject_into_assistant_message,
+                    }
                 )
+            )
         logger.info(f"index : {index} - token : {messages[index].content}")
         distance = await calculate_distance_for_token(task_config, llm_request, messages, index, starting_assistant_message)
         checks += 1
         total_distance += distance
-        if index != 0 and is_completions_payload:
-            llm_request.prompt = llm_request.prompt[: (len(llm_request.prompt) - len(text_to_inject_for_checking))]
-        elif index != 0 and not is_completions_payload:
-            llm_request.messages = llm_request.messages[:-1]
+        llm_request.messages = llm_request.messages[:-1]
 
     try:
         average_distance = total_distance / checks
