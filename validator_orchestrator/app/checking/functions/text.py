@@ -691,12 +691,10 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         if index > 0:
             text_to_inject_into_assistant_message = "".join([i.content for i in messages[:index]])
             llm_request.messages.append(
-                models.Message(
-                    **{
-                        "role": "assistant",
-                        "content": text_to_inject_into_assistant_message,
-                    }
-                )
+                {
+                    "role": "assistant",
+                    "content": text_to_inject_into_assistant_message,
+                }
             )
         logger.info(f"index : {index} - token : {messages[index].content}")
         distance = await calculate_distance_for_token_vlm(task_config, llm_request, messages, index, starting_assistant_message)
