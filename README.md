@@ -19,7 +19,7 @@ Welcome to sn19 GPU stuff! Follow the below guides to get started
 
 PS : After this, you still need to run proxy script using instructions in [Proxy setup](https://github.com/namoray/vision)
 
-# Validators 👨‍⚖️
+# Validators 👨‍⚖️ 
 
 Validators should use bare metal machines due to the use of Docker-in-Docker for job orchestration. Cloud providers like Runpod will not work for this setup.
 
