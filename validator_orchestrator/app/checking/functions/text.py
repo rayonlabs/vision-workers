@@ -165,6 +165,8 @@ async def calculate_distance_for_token_vlm(
     chat_responses: List[models.MessageResponse],
     index: int,
     starting_assistant_message: bool,
+    is_last_token: bool,
+    must_output_eos: bool
 ) -> float:
 
     messages = llm_request.messages
@@ -203,6 +205,16 @@ async def calculate_distance_for_token_vlm(
 
     # find entry in top_logprobs where `token` == text, updated acc to output from /chat/completions with VLLM_USE_V1=0
     found_entry = next((entry for entry in validator_log_probs_for_token if entry["token"] == text), None)
+
+    # Handle case of prompt_logprobs outputting |eot| token but miner response including "" output
+    if is_last_token and must_output_eos:
+        if text != "":
+            logger.info(f"token: `{text}` at last index doesn't correspond to eos "" output by miners")
+            logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
+            return 1
+        eos_token = validator_checking_response["choices"][0]["logprobs"]["content"][0]["token"]
+        found_entry = next((entry for entry in validator_log_probs_for_token if entry["token"] == eos_token), None)
+
     if not found_entry:
         logger.info(f"token: {text} - not found in vali logprobs")
         logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
@@ -544,10 +556,12 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
 
     input_chat_content = payload[MESSAGES_KEY]
 
+    must_output_eos = False
     eos_token = await _detokenize([eos_token_id], task_config.load_model_config["model"])
     # Make sure the last token is eos token where necessary, so we can check it with prompt logprobs
     if number_of_output_tokens != payload["max_tokens"] and full_response_content[-len(eos_token):] != eos_token:
         full_response_content += eos_token
+        must_output_eos = True
 
     input_chat_content_w_response = input_chat_content.copy()
     input_chat_content_w_response.append({"role": "assistant", "content": full_response_content})
@@ -700,7 +714,7 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
                 }
             )
         logger.info(f"index : {index} - token : {messages[index].content}; llm_request.messages : {llm_request.messages}")
-        distance = await calculate_distance_for_token_vlm(task_config, llm_request, messages, index, starting_assistant_message)
+        distance = await calculate_distance_for_token_vlm(task_config, llm_request, messages, index, starting_assistant_message, index == (len(messages) - 1), must_output_eos)
         checks += 1
         total_distance += distance
         llm_request.messages = copy.deepcopy(payload[MESSAGES_KEY])
