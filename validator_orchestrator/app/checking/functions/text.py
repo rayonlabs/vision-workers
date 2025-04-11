@@ -369,7 +369,8 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         "temperature": payload["temperature"],
         "max_tokens": 1,
         "prompt_logprobs": 10,
-        "add_special_tokens": False
+        "add_special_tokens": False,
+        "repetition_penalty": 1.2
     }
 
     logger.info(f"completions_payload for checks: \n{json.dumps(completions_payload, indent=2)}\n")
@@ -576,7 +577,8 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         "add_generation_prompt": False,
         "continue_final_message": True,
         "prompt_logprobs": 10,
-        "add_special_tokens": False
+        "add_special_tokens": False,
+        "repetition_penalty": 1.2
     }
 
     logger.info(f"chat_completions_payload for checks: \n{json.dumps(chat_completions_payload, indent=2)}\n")
