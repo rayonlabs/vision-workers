@@ -21,7 +21,7 @@ PS : After this, you still need to run proxy script using instructions in [Proxy
 
 # Validators 👨‍⚖️
 
-Validators should use bare metal machines due to the use of Docker-in-Docker for job orchestration. Cloud providers like Runpod or VastAI will not work for this setup.
+Validators should use bare metal machines due to the use of Docker-in-Docker for job orchestration. Cloud providers like Runpod will not work for this setup.
 
 1. [Recommened compute](recommend-compute.md)
 2. [Docs to get started](validator_orchestrator/docs/README.md)
