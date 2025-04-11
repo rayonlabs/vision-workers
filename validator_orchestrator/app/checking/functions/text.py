@@ -370,6 +370,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         "max_tokens": 1,
         "prompt_logprobs": 10,
         "add_special_tokens": False,
+        "presence_penalty": 1.8,
         "repetition_penalty": 1.8,
         "frequency_penalty": 1.8
     }
@@ -579,6 +580,7 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         "continue_final_message": True,
         "prompt_logprobs": 10,
         "add_special_tokens": False,
+        "presence_penalty": 1.8,
         "repetition_penalty": 1.8,
         "frequency_penalty": 1.8
     }
