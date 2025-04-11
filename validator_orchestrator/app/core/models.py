@@ -70,7 +70,7 @@ class CheckResultsRequest(BaseModel):
 
 class Message(BaseModel):
     role: str
-    content: Any
+    content: List[Dict[str, Union[str, Dict[str, str]]]]
 
 class MessageResponse(BaseModel):
     content: str

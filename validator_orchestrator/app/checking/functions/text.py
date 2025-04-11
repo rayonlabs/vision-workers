@@ -6,6 +6,7 @@ import httpx
 from typing import List
 import math
 from typing import Dict, Any, Tuple, Union
+import copy
 
 
 PROMPT_KEY = "prompt"
@@ -682,7 +683,9 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
 
     llm_request = models.ChatRequestModel(**payload)
     llm_request.max_tokens = 1
-    llm_request.messages = payload[MESSAGES_KEY]
+    llm_request.messages = copy.deepcopy(payload[MESSAGES_KEY])
+    logger.info(f"payload[MESSAGES_KEY] : {payload[MESSAGES_KEY]}")
+    logger.info(f"llm_request.messages : {llm_request.messages}")
 
     for i, index in enumerate(indices_to_check):
         if checks >= 5:
@@ -696,11 +699,11 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
                     "content": text_to_inject_into_assistant_message,
                 }
             )
-        logger.info(f"index : {index} - token : {messages[index].content}")
+        logger.info(f"index : {index} - token : {messages[index].content}; llm_request.messages : {llm_request.messages}")
         distance = await calculate_distance_for_token_vlm(task_config, llm_request, messages, index, starting_assistant_message)
         checks += 1
         total_distance += distance
-        llm_request.messages = llm_request.messages[:-1]
+        llm_request.messages = copy.deepcopy(payload[MESSAGES_KEY])
 
     try:
         average_distance = total_distance / checks
