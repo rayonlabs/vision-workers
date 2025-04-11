@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any, Union, Literal
 from enum import Enum
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -29,7 +29,7 @@ class ServerType(Enum):
 
 
 class ProdDockerImages(Enum):
-    LLM = "vllm/vllm-openai:v0.6.4.post1"
+    LLM = "vllm/vllm-openai:v0.8.3"
     IMAGE = "nineteenai/sn19:image_server-latest"
 
 
@@ -52,12 +52,13 @@ class OrchestratorServerConfig(BaseModel):
                 "tokenizer": "tau-vision/llama-tokenizer-fix",
                 "max_model_len": 16000,
                 "gpu_memory_utilization": 0.6,
-                "eos_token_id": 128009
+                "eos_token_id": 128009,
+                "assistant_token_id": 200019,
             },
             None,
         ]
     )
-    checking_function: str = Field(examples=["check_text_result", "check_image_result"])
+    checking_function: str = Field(examples=["check_text_result", "check_image_result", "check_vlm_result"])
     task: str = Field(examples=["chat-llama-3-1-8b"])
     endpoint: str = Field(examples=["/generate_text"])
 
@@ -67,11 +68,9 @@ class CheckResultsRequest(BaseModel):
     result: QueryResult
     payload: dict
 
-
 class Message(BaseModel):
     role: str
-    content: str
-
+    content: List[Dict[str, Union[str, Dict[str, str]]]]
 
 class MessageResponse(BaseModel):
     content: str
@@ -79,7 +78,7 @@ class MessageResponse(BaseModel):
 
 
 class ChatRequestModel(BaseModel):
-    messages: list[Message]
+    messages: List[Message]
     seed: int
     temperature: float
     max_tokens: int
