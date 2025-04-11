@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Dict, List, Optional, Any, Union, Literal
 from enum import Enum
-from pydantic import BaseModel, Field, HttpUrl, field_serializer
+from pydantic import BaseModel, Field
 from datetime import datetime
 
 AxonScores = Dict[int, float]
@@ -75,11 +75,7 @@ class TextContent(BaseModel):
 
 class ImageURLContent(BaseModel):
     type: Literal["image_url"]
-    image_url: dict[str, HttpUrl]
-
-    @field_serializer('image_url')
-    def serialize_image_url(self, v):
-        return {key: str(url) for key, url in v.items()}
+    image_url: dict[str, str]
 
 ContentItem = Union[TextContent, ImageURLContent]
 
