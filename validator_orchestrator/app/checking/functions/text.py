@@ -682,6 +682,7 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
 
     llm_request = models.ChatRequestModel(**payload)
     llm_request.max_tokens = 1
+    llm_request.messages = payload[MESSAGES_KEY]
 
     for i, index in enumerate(indices_to_check):
         if checks >= 5:
