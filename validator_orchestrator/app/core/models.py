@@ -68,20 +68,9 @@ class CheckResultsRequest(BaseModel):
     result: QueryResult
     payload: dict
 
-
-class TextContent(BaseModel):
-    type: Literal["text"]
-    text: str
-
-class ImageURLContent(BaseModel):
-    type: Literal["image_url"]
-    image_url: dict[str, str]
-
-ContentItem = Union[TextContent, ImageURLContent]
-
 class Message(BaseModel):
     role: str
-    content: Union[str, List[ContentItem]]
+    content: Any
 
 class MessageResponse(BaseModel):
     content: str
