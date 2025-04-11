@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any, Union, Literal
 from enum import Enum
 from pydantic import BaseModel, Field, HttpUrl
 from datetime import datetime
@@ -69,13 +69,15 @@ class CheckResultsRequest(BaseModel):
     payload: dict
 
 
-class ContentItem(BaseModel):
-    type: str
-    text: Union[str, None] = None  # Allow text to be optional
-    image_url: Union[HttpUrl, None] = None  # Allow image_url to be optional
+class TextContent(BaseModel):
+    type: Literal["text"]
+    text: str
 
-    class Config:
-        min_anystr_length = 1  # Optional: enforce non-empty strings when provided
+class ImageURLContent(BaseModel):
+    type: Literal["image_url"]
+    image_url: dict[str, HttpUrl]
+
+ContentItem = Union[TextContent, ImageURLContent]
 
 class Message(BaseModel):
     role: str
