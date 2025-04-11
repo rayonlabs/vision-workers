@@ -538,16 +538,17 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
     if len(messages) > payload["max_tokens"]:
         logger.error("Number of messages is greater than max_tokens, skipping logprob check, returning 0")
         return 0.0
+    
+    eos_token = await _detokenize([eos_token_id], task_config.load_model_config["model"])
+    
+    # Make sure the last token is eos token where necessary, so we can check it with prompt logprobs
+    if number_of_output_tokens != payload["max_tokens"] and messages[-1].content != eos_token:
+        full_response_content += eos_token
 
     full_response_content = "".join([message.content for message in messages])
     number_of_output_tokens = len(messages)
 
     input_chat_content = payload[MESSAGES_KEY]
-
-    eos_token = await _detokenize([eos_token_id], task_config.load_model_config["model"])
-    # Make sure the last token is eos token where necessary, so we can check it with prompt logprobs
-    if number_of_output_tokens != payload["max_tokens"] and full_response_content[-len(eos_token):] != eos_token:
-        full_response_content += eos_token
 
     input_chat_content_w_response = input_chat_content.copy()
     input_chat_content_w_response.append({"role": "assistant", "content": full_response_content})
