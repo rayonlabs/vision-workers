@@ -166,7 +166,7 @@ async def calculate_distance_for_token_vlm(
     starting_assistant_message: bool,
 ) -> float:
 
-    messages = [elm.model_dump() for elm in llm_request.messages]
+    messages = llm_request.messages
         
     # TODO: in future if upgrading from vllm 0.6.3, remember to set `add_special_tokens = False` due to "second bos" issue
     chat_completions_payload = {
