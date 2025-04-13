@@ -28,7 +28,8 @@ checking_server_configs: list[CheckingServerConfig] = [
         },
         env_vars={
             "HF_HOME": "/app/cache",
-            "HF_HUB_CACHE": "/app/cache/hub"
+            "HF_HUB_CACHE": "/app/cache/hub", 
+            "VLLM_USE_V1": "0"
         },
         network=shared_network,
         external_port=6919,

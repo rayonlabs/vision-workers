@@ -100,7 +100,7 @@ async def make_api_call(
     payload: dict,
     endpoint: str,
 ) -> dict:
-    async with httpx.AsyncClient(timeout=60) as client:
+    async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(endpoint, json=payload)
         return response.json()
 
