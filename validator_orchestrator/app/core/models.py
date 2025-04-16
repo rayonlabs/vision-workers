@@ -83,15 +83,12 @@ class ChatRequestModel(BaseModel):
     seed: int
     temperature: float
     max_tokens: int
-    number_of_logprobs: int
-    starting_assistant_message: bool
 
 class CompletionRequestModel(BaseModel):
     prompt: str
     seed: int
     temperature: float
     max_tokens: int
-    number_of_logprobs: int
     
 class MinerChatResponse(BaseModel):
     text: str
