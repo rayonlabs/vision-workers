@@ -173,7 +173,7 @@ async def calculate_distance_for_token(
             "messages": messages,
             "model": task_config.load_model_config["model"],
             "temperature": llm_request.temperature,
-            "top_p": 1,
+            "top_p": 0,
             "max_tokens": 1,
             "top_logprobs": 20,
             "add_special_tokens": False,
@@ -187,7 +187,7 @@ async def calculate_distance_for_token(
             "prompt": prompt,
             "model": task_config.load_model_config["model"],
             "temperature": llm_request.temperature,
-            "top_p": 1,
+            "top_p": 0,
             "max_tokens": 1,
             "top_logprobs": 20,
             "add_special_tokens": False
@@ -476,6 +476,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         "model": task_config.load_model_config["model"],
         "temperature": payload["temperature"],
         "max_tokens": 1,
+        "top_p": 0,
         "prompt_logprobs": 10,
         "add_special_tokens": False
     }
