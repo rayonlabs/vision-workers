@@ -175,7 +175,8 @@ async def calculate_distance_for_token(
             "temperature": llm_request.temperature,
             "top_p": 1,
             "max_tokens": 1,
-            "logprobs": 20,
+            
+            "logprobs": True,
             "add_special_tokens": False,
             "echo": True
         }
@@ -189,7 +190,7 @@ async def calculate_distance_for_token(
             "temperature": llm_request.temperature,
             "top_p": 1,
             "max_tokens": 1,
-            "logprobs": 20,
+            "logprobs": True,
             "add_special_tokens": False
         }
         endpoint = f"{BASE_URL}/v1/completions"
@@ -371,8 +372,6 @@ async def _prepare_request_for_token_check(
 ) -> tuple[Union[models.ChatRequestModel, models.CompletionRequestModel], bool]:
     """Prepare the request payload for token validation."""
     payload_copy = payload.copy()
-    payload_copy["starting_assistant_message"] = True
-    payload_copy["number_of_logprobs"] = 5
     
     if is_completions_payload:
         llm_request = models.CompletionRequestModel(**payload_copy)
