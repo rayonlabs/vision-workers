@@ -70,7 +70,7 @@ async def _detokenize(tokens: list[int], model: str) -> str:
         return r.json()["prompt"]
 
 
-async def _tokenize_and_detokenize(input_payload: dict, model_name: str, eos_token_id: int = 128009, add_generation_prompt: bool = True) -> tuple[str, int]:
+async def _tokenize_and_detokenize(input_payload: dict, model_name: str, eos_token_id: int = None, add_generation_prompt: bool = True) -> tuple[str, int]:
     async with httpx.AsyncClient() as http_client:
         logger.info(f"Tokenizing at: {BASE_URL}/tokenize")
         tokenize_response = await http_client.post(url=f"{BASE_URL}/tokenize", json=input_payload)
@@ -91,12 +91,12 @@ async def _tokenize_and_detokenize(input_payload: dict, model_name: str, eos_tok
         return prompt, len(token_list)
 
 
-async def _chat_to_prompt(messages: list[dict], model_name: str, eos_token_id: int = 128009, add_generation_prompt: bool = True) -> tuple[str, int]:
+async def _chat_to_prompt(messages: list[dict], model_name: str, eos_token_id: int = None, add_generation_prompt: bool = True) -> tuple[str, int]:
     input_payload = {"model": model_name, "messages": messages, "add_special_tokens": False}
     return await _tokenize_and_detokenize(input_payload, model_name, eos_token_id, add_generation_prompt)
 
 
-async def _completions_to_prompt(prompt: str, model_name: str, eos_token_id: int = 128009, add_generation_prompt: bool = True) -> tuple[str, int]:
+async def _completions_to_prompt(prompt: str, model_name: str, eos_token_id: int = None, add_generation_prompt: bool = True) -> tuple[str, int]:
     input_payload = {"model": model_name, "prompt": prompt}
     return await _tokenize_and_detokenize(input_payload, model_name, eos_token_id, add_generation_prompt)
 
@@ -265,7 +265,7 @@ async def _build_full_prompt(
     is_completions_payload = _payload_is_completions(payload)
     full_response_content = "".join([message.content for message in messages])
     number_of_output_tokens = len(messages)
-    eos_token_id = task_config.load_model_config.get("eos_token_id", 128009)
+    eos_token_id = task_config.load_model_config.get("eos_token_id", None)
     model_name = task_config.load_model_config["model"]
     
     if is_completions_payload:
@@ -450,7 +450,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         return await _check_null_response(result, payload, task_config)
     
     formatted_response = json.loads(result.formatted_response) if isinstance(result.formatted_response, str) else result.formatted_response
-    eos_token_id = task_config.load_model_config.get("eos_token_id", 128009)
+    eos_token_id = task_config.load_model_config.get("eos_token_id", None)
     
     try:
         messages = await _extract_messages(formatted_response, payload)
@@ -483,7 +483,9 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     }
     
     logger.info(f"Completions payload for checks: \n{json.dumps(completions_payload, indent=2)}")
-    
+    logger.info(f"Original payload: \n{json.dumps(payload, indent=2)}")
+    logger.info(f"Miner response: \n{''.join([message.content for message in messages])}")
+
     try:
         completions_result = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
     except (httpx.RequestError, json.JSONDecodeError) as e:
@@ -496,7 +498,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     # token validity
     failed_tokens_idx = []
     failed_tokens_details = []
-    max_acceptable_rank = 10 if payload["temperature"] <= 0.5 else int(10 / (1.03 - payload["temperature"]))
+    max_acceptable_rank = 20
     
     for idx, (response_token, logprobs) in enumerate(zip(all_tokens[num_input_tokens:], prompt_logprobs)):
         bad_token, reason = await _check_token_validity(
