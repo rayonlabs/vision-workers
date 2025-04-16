@@ -169,30 +169,33 @@ async def calculate_distance_for_token(
 ) -> float:
     if isinstance(llm_request, models.ChatRequestModel):
         messages = [elm.model_dump() for elm in llm_request.messages]
-        prompt, _ = await _chat_to_prompt(
-            messages=messages,
-            model_name=task_config.load_model_config["model"],
-            eos_token_id=task_config.load_model_config.get("eos_token_id", 128009),
-            add_generation_prompt=starting_assistant_message,
-        )
-        if 'deepseek-r1' in task_config.load_model_config['model'].lower():
-            prompt = await _process_think_tags_deepseek(prompt, messages)
-            
+        payload = {
+            "messages": messages,
+            "model": task_config.load_model_config["model"],
+            "temperature": llm_request.temperature,
+            "top_p": 1,
+            "max_tokens": 1,
+            "logprobs": 20,
+            "add_special_tokens": False,
+            "echo": True
+        }
+        endpoint = f"{BASE_URL}/v1/chat/completions"
+        
     elif isinstance(llm_request, models.CompletionRequestModel):
         prompt = llm_request.prompt
-
-    completions_payload = {
-        "prompt": prompt,
-        "model": task_config.load_model_config["model"],
-        "temperature": llm_request.temperature,
-        "top_p": 1,
-        "max_tokens": 1,
-        "logprobs": 20,
-        "add_special_tokens": False
-    }
+        payload = {
+            "prompt": prompt,
+            "model": task_config.load_model_config["model"],
+            "temperature": llm_request.temperature,
+            "top_p": 1,
+            "max_tokens": 1,
+            "logprobs": 20,
+            "add_special_tokens": False
+        }
+        endpoint = f"{BASE_URL}/v1/completions"
     
     try:
-        validator_checking_response = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
+        validator_checking_response = await make_api_call(payload, endpoint=endpoint)
     except json.JSONDecodeError as e:
         logger.error(f"Error decoding JSON in calculate_distance_for_token: {e}. Response: {validator_checking_response}")
         return 1
@@ -200,7 +203,7 @@ async def calculate_distance_for_token(
         logger.error(f"Request failed in calculate_distance_for_token: {e}")
         return 1
 
-    logger.info(f"Completion payload: \n{json.dumps(completions_payload, indent=2)}")
+    logger.info(f"distance payload: \n{json.dumps(payload, indent=2)}")
     logger.info(f"Validator checking response: \n{json.dumps(validator_checking_response, indent=2)}")
     logger.info(f"Chat responses context: \n{json.dumps([response.dict() for response in chat_responses[max(0, index-5):index+3]], indent=2)}")
     logger.info(f"Focus token in response: \n{json.dumps(chat_responses[index].dict(), indent=2)}")
