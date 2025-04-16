@@ -176,6 +176,7 @@ async def calculate_distance_for_token(
             "top_p": 1,
             "max_tokens": 1,
             "logprobs": True,
+            "top_logprobs": 20,
             "add_special_tokens": False,
             "echo": True
         }
@@ -190,6 +191,7 @@ async def calculate_distance_for_token(
             "top_p": 1,
             "max_tokens": 1,
             "logprobs": True,
+            "top_logprobs": 20,
             "add_special_tokens": False
         }
         endpoint = f"{BASE_URL}/v1/completions"
