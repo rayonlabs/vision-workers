@@ -175,7 +175,6 @@ async def calculate_distance_for_token(
             "temperature": llm_request.temperature,
             "top_p": 1,
             "max_tokens": 1,
-            
             "logprobs": True,
             "add_special_tokens": False,
             "echo": True
@@ -205,8 +204,8 @@ async def calculate_distance_for_token(
         return 1
 
     logger.info(f"distance payload: \n{json.dumps(payload, indent=2)}")
-    logger.info(f"Validator checking response: \n{json.dumps(validator_checking_response, indent=2)}")
-    logger.info(f"Chat responses context: \n{json.dumps([response.dict() for response in chat_responses[max(0, index-5):index+3]], indent=2)}")
+    logger.info(f"Validator checking response: \n{validator_checking_response}")
+    #logger.info(f"Chat responses context: \n{json.dumps([response.dict() for response in chat_responses[max(0, index-5):index+3]], indent=2)}")
     logger.info(f"Focus token in response: \n{json.dumps(chat_responses[index].dict(), indent=2)}")
 
     text = chat_responses[index].content
