@@ -285,10 +285,10 @@ async def _build_full_prompt(
         )
         full_prompt_before_eos = input_content + full_response_content
         
-        if 'deepseek-r1' in model_name.lower():
-            all_tokens = await _tokenize(full_prompt_before_eos, model_name, add_special_tokens=False)
-        else:    
-            all_tokens = await _tokenize(full_prompt_before_eos, model_name, add_special_tokens=True)
+        #if 'deepseek-r1' in model_name.lower():
+        #    all_tokens = await _tokenize(full_prompt_before_eos, model_name, add_special_tokens=False)
+        #else:    
+        all_tokens = await _tokenize(full_prompt_before_eos, model_name, add_special_tokens=False)
 
         # make sure the last token is eos token where necessary
         if number_of_output_tokens != payload["max_tokens"] and all_tokens[-1] != eos_token_id:
