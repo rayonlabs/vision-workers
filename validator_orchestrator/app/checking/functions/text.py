@@ -184,7 +184,7 @@ async def calculate_distance_for_token(
         "prompt": prompt,
         "model": task_config.load_model_config["model"],
         "temperature": llm_request.temperature,
-        "top_p": 1,
+        "top_p": llm_request.top_p,
         "max_tokens": 1,
         "logprobs": 20,
         "add_special_tokens": False
