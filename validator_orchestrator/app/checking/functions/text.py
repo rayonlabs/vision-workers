@@ -352,10 +352,18 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
             bad_token_found = True
             break
 
-        # If you could've stopped, why didnt you?
         if str(eos_token_id) in logprobs and str(response_token) != str(eos_token_id):
             logprob = logprobs[str(eos_token_id)]["logprob"]
             response_logprob = logprobs[str(response_token)]["logprob"]
+            
+            # Check if response_logprob is -inf to avoid division by zero
+            if response_logprob == float("-inf"):
+                # The model extremely disfavors this token, which is suspicious
+                fail_reason = "You really went out your way to avoid stopping!"
+                bad_token_found = True
+                break
+            
+            # Original check, now safe from division by zero
             if logprob > float("-inf") and math.exp(logprob) / math.exp(response_logprob) > 100:
                 fail_reason = "You really went out your way to avoid stopping!"
                 bad_token_found = True
@@ -396,7 +404,6 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
 
     # Prepare request for token validation
     payload["starting_assistant_message"] = True
-    payload["number_of_logprobs"] = 5
 
     if is_completions_payload:
         llm_request = models.CompletionRequestModel(**payload)
