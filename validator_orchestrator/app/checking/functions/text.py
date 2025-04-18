@@ -428,7 +428,9 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         "temperature": payload["temperature"],
         "max_tokens": 1,
         "prompt_logprobs": DEFAULT_PROMPT_LOGPROBS,
-        "add_special_tokens": False
+        "add_special_tokens": False,
+        "top_k": -1,
+        "top_p": 1
     }
 
     logger.info(f"completions_payload for checks: \n{json.dumps(completions_payload, indent=2)}\n")
