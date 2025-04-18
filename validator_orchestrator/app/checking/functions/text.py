@@ -59,7 +59,7 @@ def _extract_chat_message(idx: int, response: dict) -> Union[models.MessageRespo
         if role == "assistant":
             return None
             
-    text_token = logprobs["tokens"][0]
+    text_token = logprobs["content"][0]["token"]
     logprob = logprobs["content"][0]["logprob"]
     return models.MessageResponse(content=content, logits=models.LogitResponse(text_token=text_token, logprob=logprob))
 
