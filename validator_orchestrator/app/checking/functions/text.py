@@ -21,7 +21,7 @@ MAX_FAILED_TOKENS = 5
 MAX_CHECKS = 5
 
 DEFAULT_NUM_LOGPROBS = 20
-DEFAULT_PROMPT_LOGPROBS = 9 #vllm 0.8.3 breaks with prompt_logprobs > 9
+DEFAULT_PROMPT_LOGPROBS = 1 #vllm 0.8.3 breaks at some arbitrary prompt_logprobs > 1: https://github.com/vllm-project/vllm/issues/16836 
 
 MODELS_FOR_EOT_HANDLING = ["llama-3", "deepseek-r1", "qwq-32b", "qwen2.5-7b"]
 
