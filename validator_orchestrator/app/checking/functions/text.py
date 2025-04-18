@@ -21,7 +21,7 @@ MAX_FAILED_TOKENS = 5
 MAX_CHECKS = 5
 
 DEFAULT_NUM_LOGPROBS = 20
-DEFAULT_PROMPT_LOGPROBS = 10
+DEFAULT_PROMPT_LOGPROBS = 1 #vllm 0.8.3 breaks at some arbitrary prompt_logprobs > 1: https://github.com/vllm-project/vllm/issues/16836 
 
 MODELS_FOR_EOT_HANDLING = ["llama-3", "deepseek-r1", "qwq-32b", "qwen2.5-7b"]
 
@@ -45,8 +45,9 @@ def _extract_completions_message(idx: int, response: dict) -> models.MessageResp
     if idx == 0 and content == "" and logprobs is None:
         return None
 
+    text_token = logprobs["tokens"][0]
     logprob = logprobs["token_logprobs"][0]
-    return models.MessageResponse(content=content, logprob=logprob)
+    return models.MessageResponse(content=content, logits=models.LogitResponse(text_token=text_token, logprob=logprob))
 
 
 def _extract_chat_message(idx: int, response: dict) -> Union[models.MessageResponse, None]:
@@ -58,8 +59,9 @@ def _extract_chat_message(idx: int, response: dict) -> Union[models.MessageRespo
         if role == "assistant":
             return None
             
+    text_token = logprobs["content"][0]["token"]
     logprob = logprobs["content"][0]["logprob"]
-    return models.MessageResponse(content=content, logprob=logprob)
+    return models.MessageResponse(content=content, logits=models.LogitResponse(text_token=text_token, logprob=logprob))
 
 
 async def _tokenize(prompt: str, model: str, add_special_tokens: bool) -> list[int]:
@@ -201,6 +203,7 @@ async def calculate_distance_for_token(
         "model": model_name,
         "temperature": llm_request.temperature,
         "top_p": llm_request.top_p,
+        "top_k": -1,
         "max_tokens": 1,
         "logprobs": DEFAULT_NUM_LOGPROBS,
         "add_special_tokens": False
@@ -220,22 +223,25 @@ async def calculate_distance_for_token(
     logger.info(f"chat_responses: \n{json.dumps([response.dict() for response in chat_responses[max(0, index-5):index+3]], indent=2)}\n")
     logger.info(f"focus token in response: \n{json.dumps(chat_responses[index].dict(), indent=2)}\n")
 
-    text = chat_responses[index].content
+    # tweaked when upgrading vllm 0.6.4.post1 to 0.8.3 due to `\u0120` being present in upgraded version, https://gist.github.com/tripathiarpan20/f742eacd9f462656c10ce202bbb86dde
+    #text = chat_responses[index].content
+    text = chat_responses[index].logits.text_token
+
     validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["top_logprobs"][0]
 
     if text not in validator_log_probs_for_token:
-        logger.info(f"token: {text} - not found in vali logprobs")
+        logger.info(f"token: {chat_responses[index].content} (parsed as {text}) - not found in vali logprobs")
         logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
         return 1
     else:
-        distance = min(abs(math.exp(validator_log_probs_for_token[text]) - math.exp(chat_responses[index].logprob)), 1)
-        logger.info(f"token: {text} - logprob : {chat_responses[index].logprob}")
+        distance = min(abs(math.exp(validator_log_probs_for_token[text]) - math.exp(chat_responses[index].logits.logprob)), 1)
+        logger.info(f"token: {text} - logprob : {chat_responses[index].logits.logprob}")
         logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
 
     return distance
 
 
-async def _extract_messages(formatted_response, is_completions_payload):
+async def _extract_messages(formatted_response, is_completions_payload) -> List[models.MessageResponse]:
     messages = []
     for idx, response in enumerate(formatted_response):
         try:
@@ -294,14 +300,14 @@ async def _get_full_prompt(is_completions_payload, payload, messages, task_confi
         return full_prompt, all_tokens, num_input_tokens
 
 
-async def _validate_tokens(all_tokens, num_input_tokens, messages, prompt_logprobs, payload, eos_token_id):
+async def _validate_tokens(all_tokens: List, num_input_tokens: int, messages: List[models.MessageResponse], prompt_logprobs: List[Dict[str, Any]], payload: Dict, eos_token_id: int):
     failed_tokens_idx = []
     failed_tokens_details = []
     max_acceptable_rank = 10 if payload["temperature"] <= 0.5 else int(10 / (1.03 - payload["temperature"]))
 
     for idx, response_token, logprobs in zip(range(len(all_tokens[num_input_tokens:])), all_tokens[num_input_tokens:], prompt_logprobs):
         nice_logprobs = json.dumps(logprobs, indent=2, sort_keys=True, ensure_ascii=False)
-        additional_log = f" (decoded: '{messages[idx].content}', logprob: {messages[idx].logprob})" if idx <= len(messages) - 1 else ""
+        additional_log = f" (decoded: '{messages[idx].content}', logprob: {messages[idx].logits.logprob})" if idx <= len(messages) - 1 else ""
 
         if str(response_token) in logprobs:
             logprob = logprobs[str(response_token)]["logprob"]
@@ -427,8 +433,12 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         "model": task_config.load_model_config["model"],
         "temperature": payload["temperature"],
         "max_tokens": 1,
+        "logprobs": True,
         "prompt_logprobs": DEFAULT_PROMPT_LOGPROBS,
-        "add_special_tokens": False
+        "add_special_tokens": False,
+        "top_k": -1,
+        "top_p": 1,
+        "stream": False
     }
 
     logger.info(f"completions_payload for checks: \n{json.dumps(completions_payload, indent=2)}\n")
