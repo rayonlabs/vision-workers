@@ -230,7 +230,7 @@ async def calculate_distance_for_token(
     validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["top_logprobs"][0]
 
     if text not in validator_log_probs_for_token:
-        logger.info(f"token: {text} - not found in vali logprobs")
+        logger.info(f"token: {chat_responses[index].content} (parsed as {text}) - not found in vali logprobs")
         logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
         return 1
     else:
