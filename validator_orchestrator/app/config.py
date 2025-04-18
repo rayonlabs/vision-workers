@@ -27,7 +27,7 @@ checking_server_configs: list[CheckingServerConfig] = [
             "HF": "/app/cache",
         },
         env_vars={
-            "VLLM_USE_V1": "1",
+            "VLLM_USE_V1": "0",
             "HF_HOME": "/app/cache",
             "HF_HUB_CACHE": "/app/cache/hub"
         },
