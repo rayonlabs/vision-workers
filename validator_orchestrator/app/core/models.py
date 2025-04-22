@@ -89,7 +89,6 @@ class ChatRequestModel(BaseModel):
     seed: int
     temperature: float
     max_tokens: int
-    starting_assistant_message: bool
     top_p: float = 1
 
 class CompletionRequestModel(BaseModel):
