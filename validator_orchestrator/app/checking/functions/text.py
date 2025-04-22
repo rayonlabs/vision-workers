@@ -185,6 +185,7 @@ async def calculate_distance_for_token_vlm(
 ) -> float:
 
     messages = llm_request.messages
+    messages = [msg.model_dump() if hasattr(msg, 'model_dump') else msg for msg in messages]
 
     chat_completions_payload = {
         "messages": messages,
