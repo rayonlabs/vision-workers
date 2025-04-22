@@ -627,6 +627,8 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
 
     prompt_logprobs = result["prompt_logprobs"]
 
+    logger.info(f"prompt_logprobs : {json.dumps(prompt_logprobs, indent=2)}")
+
     _, input_token_count = await _chat_to_prompt(
             messages=original_messages,
             model_name=task_config.load_model_config["model"],
