@@ -549,36 +549,17 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     return await _perform_token_checks(task_config, payload, messages, indices_to_check)
 
 async def check_vlm_result(result: models.QueryResult, payload: dict, task_config: models.OrchestratorServerConfig) -> Union[float, None]:
-    # check fail
     if result.formatted_response is None:
         miner_status_code = result.status_code
         _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
         logger.info(f"miner status code: {miner_status_code} - vali status code : {vali_status_code}")
-        if str(vali_status_code[0]) == str(miner_status_code[0]):
-            return 1
-        else:
-            return -3
-
+        return 1 if str(vali_status_code[0]) == str(miner_status_code[0]) else -3
+    
     formatted_response = json.loads(result.formatted_response) if isinstance(result.formatted_response, str) else result.formatted_response
-    eos_token_id = task_config.load_model_config.get("eos_token_id", 128009)
-    assistant_token_id = task_config.load_model_config.get("assistant_token_id", 200019)
-
-    # Extract messages & logprobs from the response
-    messages: list[models.MessageResponse] = []
-    for idx, response in enumerate(formatted_response):
-        try:
-            message = _extract_chat_message(idx, response)
-
-            if message is not None:
-                messages.append(message)
-        except Exception as e:
-            logger.error(f"Error with logprob: {e}. Response: {response}")
-            logger.exception(e)
-            return 0  # Important to return 0 as this is a critical error
-
+    
+    messages = await _extract_messages(formatted_response, is_completions_payload=False)
     if not messages:
         logger.error("No valid messages in response.")
-        logger.exception(formatted_response)
         return 0.0
 
     if len(messages) > payload["max_tokens"]:
@@ -586,22 +567,19 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         return 0.0
 
     full_response_content = "".join([message.content for message in messages])
-    number_of_output_tokens = len(messages)
-
+    eos_token_id = task_config.load_model_config.get("eos_token_id", 128009)
+    
     input_chat_content = payload[MESSAGES_KEY]
-
     must_output_eos = False
     eos_token = await _detokenize([eos_token_id], task_config.load_model_config["model"])
-    # Make sure the last token is eos token where necessary, so we can check it with prompt logprobs
-    if number_of_output_tokens != payload["max_tokens"] and full_response_content[-len(eos_token):] != eos_token:
+    
+    if len(messages) != payload["max_tokens"] and full_response_content[-len(eos_token):] != eos_token:
         full_response_content += eos_token
         must_output_eos = True
 
     input_chat_content_w_response = input_chat_content.copy()
     input_chat_content_w_response.append({"role": "assistant", "content": full_response_content})
 
-    # Now get the prompt logprobs from completions and check they are all correct
-    # TODO: in future if upgrading from vllm 0.6.3, remember to set `add_special_tokens = False` due to "second bos" issue
     chat_completions_payload = {
         "messages": input_chat_content_w_response,
         "model": task_config.load_model_config["model"],
@@ -609,7 +587,7 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         "max_tokens": 1,
         "add_generation_prompt": False,
         "continue_final_message": True,
-        "prompt_logprobs": 10,
+        "prompt_logprobs": DEFAULT_PROMPT_LOGPROBS,
         "add_special_tokens": False
     }
 
@@ -622,22 +600,17 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         logger.error(f"API call failed: {e}")
         return 0.9876
 
-
-    original_messages = payload[MESSAGES_KEY]
-
-    prompt_logprobs = result["prompt_logprobs"]
-
-    logger.info(f"prompt_logprobs : {prompt_logprobs[:2]}")
-
     _, input_token_count = await _chat_to_prompt(
-            messages=original_messages,
-            model_name=task_config.load_model_config["model"],
-            eos_token_id=task_config.load_model_config["eos_token_id"],
-            add_generation_prompt=True
-            )
+        messages=input_chat_content,
+        model_name=task_config.load_model_config["model"],
+        eos_token_id=eos_token_id,
+        add_generation_prompt=True
+    )
+    
+    prompt_logprobs = result["prompt_logprobs"]
+    
     last_input_token_index = input_token_count - 1
-
-
+    
     try:
         assert last_input_token_index is not None
     except AssertionError:
@@ -645,122 +618,117 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         return 0
     
     prompt_logprobs = prompt_logprobs[last_input_token_index + 1:]
-
-    bad_token_found = False
-
-    fail_reason = ""
-
+    logger.info(f"prompt_logprobs : {prompt_logprobs[:2]}")
+    
     failed_tokens_idx = []
     failed_tokens_details = []
-
     max_acceptable_rank = 10 if payload["temperature"] <= 0.5 else int(10 / (1.03 - payload["temperature"]))
-
-    for idx, response_obj, logprobs in zip(range(len(messages)), messages, prompt_logprobs):
-        # Just a helper for nicer printing
-        nice_logprobs = json.dumps(logprobs, indent=2, sort_keys=True, ensure_ascii=False)
-
-        # The edge case here is when the messages didn't include the end of token
-        # So sometimes we don't have a message for the last token
-        additional_log = f" (decoded: '{messages[idx].content}', logprob: {messages[idx].logprob})" if idx <= len(messages) - 1 else ""
-
-        # Check if the decoded token (miner output) is in the corresponding prompt logprobs
-        found_key = next((token_id for d in prompt_logprobs for token_id, info in d.items() if info["decoded_token"] == response_obj.content), None)
-
-        if found_key:
-            logprob = logprobs[found_key]["logprob"]
-            rank = logprobs[found_key]["rank"]
-            if rank <  max_acceptable_rank and logprob > float("-inf"):
-                logger.info(f"Token {response_obj.content} {additional_log} in logprobs with good behaviour; rank: {rank}, logprob: {logprob} ✅")
-            else:
-                logger.error(f"Token {response_obj.content} {additional_log} in logprobs with bad behaviour; rank: {rank}, logprob: {logprob} ❌")
-                failed_tokens_idx.append(idx)
-                failed_tokens_details.append((response_obj.content, rank, logprob, additional_log))
-
-                if len(failed_tokens_idx) > 5:
-                    failed_tokens_details = json.dumps(failed_tokens_details, indent=2, sort_keys=True, ensure_ascii=False)
-                    fail_reason = f"Too many bad tokens found ('response_token', 'rank', 'logprob', 'additional_log'):\n{failed_tokens_details}"
-                    bad_token_found = True
-                    break
-        else:
-            logger.error(f"Token {response_obj.content} {additional_log} not found in logprobs :(")
-            bad_token_found = True
-            break
-
-        # If you could've stopped, why didnt you?
-        if str(eos_token_id) in logprobs and response_obj.content != str(eos_token_id):
-            logprob = logprobs[str(eos_token_id)]["logprob"]
-            response_logprob = logprobs[found_key]["logprob"]
-            if logprob > float("-inf") and math.exp(logprob) / math.exp(response_logprob) > 100:
-                fail_reason = "You really went out your way to avoid stopping!"
-                bad_token_found = True
+    
+    for idx, response_obj, logprobs_entry in zip(range(len(messages)), messages, prompt_logprobs):
+        nice_logprobs = json.dumps(logprobs_entry, indent=2, sort_keys=True, ensure_ascii=False)
+        additional_log = f" (decoded: '{response_obj.content}', logprob: {response_obj.logprob})"
+        
+        token_found = False
+        for token_id, info in logprobs_entry.items():
+            if info.get("decoded_token") == response_obj.content:
+                token_found = True
+                logprob = info["logprob"]
+                rank = info["rank"]
+                
+                if rank < max_acceptable_rank and logprob > float("-inf"):
+                    logger.info(f"Token {response_obj.content} {additional_log} in logprobs with good behaviour; rank: {rank}, logprob: {logprob} ✅")
+                else:
+                    logger.error(f"Token {response_obj.content} {additional_log} in logprobs with bad behaviour; rank: {rank}, logprob: {logprob} ❌")
+                    failed_tokens_idx.append(idx)
+                    failed_tokens_details.append((response_obj.content, rank, logprob, additional_log))
+                    
+                    if len(failed_tokens_idx) > MAX_FAILED_TOKENS:
+                        failed_tokens_details = json.dumps(failed_tokens_details, indent=2, sort_keys=True, ensure_ascii=False)
+                        fail_reason = f"Too many bad tokens found ('response_token', 'rank', 'logprob', 'additional_log'):\n{failed_tokens_details}"
+                        return 0.0
                 break
-
-    if bad_token_found:
-        # TODO: Make a nice message
-        logger.error(f"Bad token (s) found at indexes {failed_tokens_idx}." f" Prompt logprobs: {nice_logprobs}" f" Reason: {fail_reason}")
-        return 0.0
-
+        
+        if not token_found:
+            logger.error(f"Token {response_obj.content} {additional_log} not found in logprobs :(")
+            return 0.0
+            
+        eos_token_key = None
+        for token_id, info in logprobs_entry.items():
+            if int(token_id) == eos_token_id:
+                eos_token_key = token_id
+                break
+                
+        if eos_token_key and response_obj.content != eos_token:
+            eos_logprob = logprobs_entry[eos_token_key]["logprob"]
+            response_token_key = next((k for k, v in logprobs_entry.items() if v.get("decoded_token") == response_obj.content), None)
+            
+            if response_token_key:
+                response_logprob = logprobs_entry[response_token_key]["logprob"]
+                if eos_logprob > float("-inf") and math.exp(eos_logprob) / math.exp(response_logprob) > 100:
+                    return 0.0
+    
     logger.info("All tokens found in prompt_logprobs! ✅")
-
-    # Now lets do some fine grained checking
-
-    if len(messages) == 1:
-        indices_to_check = [0]
-    else:
-        # Always check first & last
-        indices_to_check = [0, len(messages) - 1] 
-
-        if len(failed_tokens_idx)>0:
-            indices_to_check += failed_tokens_idx[:3]
-
-        remaining_indexes = list(set(list(set(range(0, len(messages))) - set(indices_to_check))))
-
-        number_of_additional_indices_to_check = min(5 - len(indices_to_check), len(messages) - 2) 
+    
+    indices_to_check = [0, len(messages) - 1] if len(messages) > 1 else [0]
+    
+    if failed_tokens_idx:
+        indices_to_check += failed_tokens_idx[:3]
+        
+    remaining_indexes = list(set(range(0, len(messages))) - set(indices_to_check))
+    number_of_additional_indices_to_check = min(MAX_CHECKS - len(indices_to_check), len(messages) - 2)
+    
+    if remaining_indexes and number_of_additional_indices_to_check > 0:
         additional_indices_to_check = random.sample(
             remaining_indexes,
             number_of_additional_indices_to_check,
         )
         indices_to_check.extend(additional_indices_to_check)
-
-    logger.info(f"failed token indexes : {failed_tokens_idx}")
-    logger.info(f"logprobs indexes to check : {indices_to_check}")
-
+        
+    logger.info(f"failed token indexes: {failed_tokens_idx}")
+    logger.info(f"logprobs indexes to check: {indices_to_check}")
+    
     total_distance = 0
     checks = 0
-
-    # Prepare request for token validation
-    payload["starting_assistant_message"] = True
-    payload["number_of_logprobs"] = 5
-
-
+    
     llm_request = models.ChatRequestModel(**payload)
     llm_request.max_tokens = 1
-    llm_request.messages = copy.deepcopy(payload[MESSAGES_KEY])
-    logger.info(f"payload[MESSAGES_KEY] : {payload[MESSAGES_KEY]}")
-    logger.info(f"llm_request.messages : {llm_request.messages}")
-
+    
     for i, index in enumerate(indices_to_check):
-        if checks >= 5:
+        if checks >= MAX_CHECKS:
             break
+            
         starting_assistant_message = i == 0
         if index > 0:
             text_to_inject_into_assistant_message = "".join([i.content for i in messages[:index]])
             llm_request.messages.append(
-                {
-                    "role": "assistant",
-                    "content": text_to_inject_into_assistant_message,
-                }
+                models.Message(
+                    **{
+                        "role": "assistant",
+                        "content": text_to_inject_into_assistant_message,
+                    }
+                )
             )
-        logger.info(f"index : {index} - token : {messages[index].content}; llm_request.messages : {llm_request.messages}")
-        distance = await calculate_distance_for_token_vlm(task_config, llm_request, messages, index, starting_assistant_message, index == (len(messages) - 1), must_output_eos)
+            
+        logger.info(f"index: {index} - token: {messages[index].content}")
+        distance = await calculate_distance_for_token_vlm(
+            task_config, 
+            llm_request, 
+            messages, 
+            index, 
+            starting_assistant_message,
+            index == (len(messages) - 1),
+            must_output_eos
+        )
         checks += 1
         total_distance += distance
-        llm_request.messages = copy.deepcopy(payload[MESSAGES_KEY])
-
+        
+        if index != 0:
+            llm_request.messages = llm_request.messages[:-1]
+            
     try:
         average_distance = total_distance / checks
     except Exception as e:
         logger.error(f"Error with average distance: {e}. Total distance: {total_distance}. Checks: {checks}")
         return 0
-    score = _score_average_distance(average_distance)
-    return score
+        
+    return _score_average_distance(average_distance)
