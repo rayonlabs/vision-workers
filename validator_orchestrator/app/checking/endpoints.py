@@ -48,6 +48,8 @@ def _get_llm_server_docker_flags(task_config: models.OrchestratorServerConfig) -
     if load_model_config.get('half_precision', True):
         flags += " --dtype half"
 
+    if load_model_config.get('trust_remote_code', False):
+        flags += " --trust-remote-code"
 
     return flags
 
