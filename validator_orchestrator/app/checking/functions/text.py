@@ -623,24 +623,26 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         return 0.9876
 
 
+    original_messages = payload[MESSAGES_KEY]
 
-    #TODO: calculate num_input_tokens with /chat/completions input that also has image input (which gets ignored by /tokenize endpoint, a bit tricky yea)
+    prompt_logprobs = result["prompt_logprobs"]
 
-    # Get the last occurance of the assistant token in the prompt logprobs
-    prompt_logprobs = result["prompt_logprobs"] #referring to vllm /chat/completions output body with prompt_logprobs
-    last_assistant_index = None
-    for i in range(len(prompt_logprobs) - 1, -1, -1):
-        d = prompt_logprobs[i]
-        if str(assistant_token_id) in d and d[str(assistant_token_id)]["rank"] == 1:
-            last_assistant_index = i
-            break
+    _, input_token_count = await _chat_to_prompt(
+            messages=original_messages,
+            model_name=task_config.load_model_config["model"],
+            eos_token_id=task_config.load_model_config["eos_token_id"],
+            add_generation_prompt=True
+            )
+    last_input_token_index = input_token_count - 1
+
 
     try:
-        assert last_assistant_index is not None
+        assert last_input_token_index is not None
     except AssertionError:
         logger.error(f"Assistant token not found in prompt logprobs of miner : {prompt_logprobs}")
-        return 0    
-    prompt_logprobs = prompt_logprobs[last_assistant_index + 1:]
+        return 0
+    
+    prompt_logprobs = prompt_logprobs[last_input_token_index + 1:]
 
     bad_token_found = False
 
