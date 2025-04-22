@@ -599,26 +599,11 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         logger.exception(e)
         logger.error(f"API call failed: {e}")
         return 0.9876
-
-    _, input_token_count = await _chat_to_prompt(
-        messages=input_chat_content,
-        model_name=task_config.load_model_config["model"],
-        eos_token_id=eos_token_id,
-        add_generation_prompt=True
-    )
     
-    prompt_logprobs = result["prompt_logprobs"]
+    n_generated_tokens = len(messages) - 1
     
-    last_input_token_index = input_token_count - 1
-    
-    try:
-        assert last_input_token_index is not None
-    except AssertionError:
-        logger.error(f"Assistant token not found in prompt logprobs of miner : {prompt_logprobs}")
-        return 0
-    
-    prompt_logprobs = prompt_logprobs[last_input_token_index + 1:]
-    logger.info(f"prompt_logprobs : {prompt_logprobs[:2]}")
+    prompt_logprobs = result["prompt_logprobs"][-n_generated_tokens:]
+    logger.info(f"prompt_logprobs : {json.dumps(prompt_logprobs[:2], indent=2)}")
     
     failed_tokens_idx = []
     failed_tokens_details = []
@@ -650,6 +635,7 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         
         if not token_found:
             logger.error(f"Token {response_obj.content} {additional_log} not found in logprobs :(")
+            logger.info(f"logprobs_entry : {logprobs_entry}")
             return 0.0
             
         eos_token_key = None
