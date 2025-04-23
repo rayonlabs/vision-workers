@@ -323,14 +323,24 @@ async def _validate_tokens(all_tokens, num_input_tokens, messages, prompt_logpro
             return True, "Token not found in logprobs", failed_tokens_idx
 
         if str(eos_token_id) in logprobs and str(response_token) != str(eos_token_id):
-            logprob = logprobs[str(eos_token_id)]["logprob"]
+            eos_logprob = logprobs[str(eos_token_id)]["logprob"]
             response_logprob = logprobs[str(response_token)]["logprob"]
             
             if response_logprob == float("-inf"):
                 return True, "You really went out your way to avoid stopping!", failed_tokens_idx
             
-            if logprob > float("-inf") and math.exp(logprob) / math.exp(response_logprob) > 100:
-                return True, "You really went out your way to avoid stopping!", failed_tokens_idx
+            if eos_logprob > float("-inf"):
+                try:
+                    if response_logprob > float("-inf"):
+                        prob_ratio = math.exp(eos_logprob) / math.exp(response_logprob)
+                        if prob_ratio > 100:
+                            return True, "You really went out your way to avoid stopping!", failed_tokens_idx
+                    else:
+                        pass
+                    
+                except (ZeroDivisionError, OverflowError):
+                    logger.warning("Math error when comparing token probabilities")
+                    continue
 
     return False, "", failed_tokens_idx
 
