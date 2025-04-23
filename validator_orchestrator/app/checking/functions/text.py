@@ -337,10 +337,10 @@ async def _validate_tokens(all_tokens, num_input_tokens, messages, prompt_logpro
                             return True, "You really went out your way to avoid stopping!", failed_tokens_idx
                     else:
                         pass
-                    
+
                 except (ZeroDivisionError, OverflowError):
                     logger.warning("Math error when comparing token probabilities")
-                    continue
+                    return True, "You really went out your way to avoid stopping!", failed_tokens_idx
 
     return False, "", failed_tokens_idx
 
