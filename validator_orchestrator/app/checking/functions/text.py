@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Tuple, Union
 import math
 import copy
 
+BASE_URL = "http://llm_server:6919".rstrip("/")
 
 BASE_URL = "http://llm_server:6919".rstrip("/")
 
@@ -719,3 +720,4 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         return 0
         
     return _score_average_distance(average_distance)
+    return await _perform_token_checks(task_config, payload, messages, indices_to_check)
