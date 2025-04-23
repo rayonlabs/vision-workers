@@ -602,7 +602,7 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         logger.error(f"API call failed: {e}")
         return 0.9876
     
-    n_generated_tokens = len(messages) - 1
+    n_generated_tokens = len(messages)
     
     prompt_logprobs = result["prompt_logprobs"][-n_generated_tokens:]
     logger.info(f"prompt_logprobs : {json.dumps(prompt_logprobs[:2], indent=2)}")
