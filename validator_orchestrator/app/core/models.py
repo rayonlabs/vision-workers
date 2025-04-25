@@ -54,7 +54,7 @@ class OrchestratorServerConfig(BaseModel):
                 "gpu_memory_utilization": 0.6,
                 "eos_token_id": 128009,
                 "trust_remote_code": True,
-                "assistant_token_id": 200019
+                "limit_mm_per_prompt": 2
             },
             None,
         ]
