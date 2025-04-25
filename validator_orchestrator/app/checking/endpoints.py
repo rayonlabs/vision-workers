@@ -41,7 +41,7 @@ def _get_llm_server_docker_flags(task_config: models.OrchestratorServerConfig) -
     flags += f" --num-scheduler-steps {load_model_config.get('num_scheduler_steps', 1)}"
 
     if load_model_config.get("limit_mm_per_prompt", None):
-        flags += f" --limit-mm-per-prompt {load_model_config['limit_mm_per_prompt']}"
+        flags += f" --limit-mm-per-prompt image={load_model_config['limit_mm_per_prompt']}"
 
     flags += " --port 6919 --enable-chunked-prefill"
 
