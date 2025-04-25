@@ -46,6 +46,9 @@ def _extract_completions_message(idx: int, response: dict) -> models.MessageResp
         return None
 
     logprob = logprobs["token_logprobs"][0]
+    if content in logprobs["top_logprobs"][0]:
+        logprob = logprobs["top_logprobs"][0][content]
+
     return models.MessageResponse(content=content, logprob=logprob)
 
 
