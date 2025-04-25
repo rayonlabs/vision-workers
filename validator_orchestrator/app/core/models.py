@@ -72,7 +72,7 @@ class CheckResultsRequest(BaseModel):
 
 class VlmMessage(BaseModel):
     role: str
-    content: List[Dict[str, Union[str, Dict[str, str]]]]
+    content: List[Dict[str, Union[str, Dict]]]
 
 class Message(BaseModel):
     role: str
