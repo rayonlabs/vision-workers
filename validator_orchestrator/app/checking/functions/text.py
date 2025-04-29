@@ -577,6 +577,19 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
             return 1 if str(vali_status_code[0]) == str(miner_status_code[0]) else -3
     
     formatted_response = json.loads(result.formatted_response) if isinstance(result.formatted_response, str) else result.formatted_response
+
+    # ---- TEMPORARY FIX FOR VLM ----
+    first_message = _extract_chat_message(0, formatted_response[0])
+    second_message = _extract_chat_message(1, formatted_response[1])
+
+    if first_message.content == "!" and first_message.logprob is None:
+        logger.error("Content is '!' and logprob is null - punishing mfs")
+        return -100
+    
+    if second_message.content == "!" and second_message.logprob is None:
+        logger.error("Content is '!' and logprob is null - punishing mfs")
+        return -100
+    # ---- TEMPORARY FIX FOR VLM ----
     
     messages = await _extract_messages(formatted_response, is_completions_payload=False)
     if not messages:
