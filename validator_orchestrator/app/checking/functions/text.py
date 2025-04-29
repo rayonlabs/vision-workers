@@ -481,7 +481,10 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         miner_status_code = result.status_code
         _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
         logger.info(f"miner status code: {miner_status_code} - vali status code : {vali_status_code}")
-        return 1 if str(vali_status_code[0]) == str(miner_status_code[0]) else -3
+        if type(vali_status_code) is int:
+            return 1 if str(vali_status_code) == str(miner_status_code) else -3
+        else:
+            return 1 if str(vali_status_code[0]) == str(miner_status_code[0]) else -3
     
     formatted_response = json.loads(result.formatted_response) if isinstance(result.formatted_response, str) else result.formatted_response
     is_completions_payload = _payload_is_completions(payload)
@@ -568,7 +571,10 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         miner_status_code = result.status_code
         _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
         logger.info(f"miner status code: {miner_status_code} - vali status code : {vali_status_code}")
-        return 1 if str(vali_status_code[0]) == str(miner_status_code[0]) else -3
+        if type(vali_status_code) is int:
+            return 1 if str(vali_status_code) == str(miner_status_code) else -3
+        else:
+            return 1 if str(vali_status_code[0]) == str(miner_status_code[0]) else -3
     
     formatted_response = json.loads(result.formatted_response) if isinstance(result.formatted_response, str) else result.formatted_response
     
