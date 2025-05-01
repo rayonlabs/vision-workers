@@ -130,7 +130,7 @@ async def query_endpoint_with_status(
     data: Dict[str, Any],
     base_url: str = BASE_URL
 ) -> Tuple[Union[Dict[str, Any], None], int]:
-    url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+    url = f"{base_url.rstrip('/')}/v1/{endpoint.lstrip('/')}"
     
     async with httpx.AsyncClient(timeout=SHORT_TIMEOUT) as client:
         logger.info(f"Querying: {url}")
@@ -479,6 +479,7 @@ async def _perform_token_checks(task_config, payload, messages, indices_to_check
 async def check_text_result(result: models.QueryResult, payload: dict, task_config: models.OrchestratorServerConfig) -> Union[float, None]:
     if result.formatted_response is None:
         miner_status_code = result.status_code
+        payload["model"] = task_config.load_model_config["model"]
         _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
         logger.info(f"miner status code: {miner_status_code} - vali status code : {vali_status_code}")
         if type(vali_status_code) is int:
@@ -569,6 +570,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
 async def check_vlm_result(result: models.QueryResult, payload: dict, task_config: models.OrchestratorServerConfig) -> Union[float, None]:
     if result.formatted_response is None:
         miner_status_code = result.status_code
+        payload["model"] = task_config.load_model_config["model"]
         _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
         logger.info(f"miner status code: {miner_status_code} - vali status code : {vali_status_code}")
         if type(vali_status_code) is int:
