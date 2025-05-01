@@ -26,7 +26,7 @@ MAX_CHECKS = 5
 DEFAULT_NUM_LOGPROBS = 20
 DEFAULT_PROMPT_LOGPROBS = 10
 
-MODELS_FOR_EOT_HANDLING = ["llama-3", "deepseek-r1", "qwq-32b", "qwen2.5-7b"]
+MODELS_FOR_EOT_HANDLING = ["llama-3", "deepseek-r1", "qwq-32b", "qwen-2-5-7b", "qwen3"]
 
 
 def _score_average_distance(average_distance: float) -> float:
