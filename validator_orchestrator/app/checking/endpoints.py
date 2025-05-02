@@ -45,9 +45,11 @@ def _get_llm_server_docker_flags(task_config: models.OrchestratorServerConfig) -
 
     flags += " --port 6919 --enable-chunked-prefill"
 
-    
     if load_model_config.get("revision", None):
         flags += f" --revision {load_model_config['revision']}"
+
+    if load_model_config.get("max_num_batched_tokens", None):
+        flags += f" --max-num-batched-tokens {load_model_config['max_num_batched_tokens']}"
 
     if load_model_config.get('half_precision', True):
         flags += " --dtype half"
