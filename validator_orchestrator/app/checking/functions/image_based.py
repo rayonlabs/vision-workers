@@ -95,8 +95,11 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
         return -2
 
     else:
-        return await _get_image_similarity(
-            image_response_body,
-            expected_image_response,
-            images_are_same_classifier,
-        )
+        if expected_image_response.is_nsfw:
+            return 1
+        else:
+            return await _get_image_similarity(
+                image_response_body,
+                expected_image_response,
+                images_are_same_classifier,
+            )
