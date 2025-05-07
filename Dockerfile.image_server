@@ -19,9 +19,9 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
     && ./Miniconda3-latest-Linux-x86_64.sh -b \
     && rm Miniconda3-latest-Linux-x86_64.sh
 
-ENV PATH="/root/miniconda3/bin:${PATH}"
+ENV PATH="/user/miniconda3/bin:${PATH}"
 RUN conda create -n venv_image python=3.10.13 -y
-ENV PATH="/root/miniconda3/envs/venv_image/bin:${PATH}"
+ENV PATH="/user/miniconda3/envs/venv_image/bin:${PATH}"
 
 RUN apt-get update \
     && apt-get upgrade -y \
@@ -53,7 +53,7 @@ RUN pip install --upgrade pip \
     && pip install --upgrade pip setuptools==69.5.1 \
     && pip install -r /app/requirements.txt  \
     && pip install huggingface_hub[hf_transfer] \
-    && rm -rf /root/.cache/pip/* 
+    && rm -rf /user/.cache/pip/* 
 
 COPY image_server /app/image_server
 
@@ -61,7 +61,7 @@ ENV APP_HOST=0.0.0.0
 ENV APP_PORT=8080
 ENV HF_HUB_ENABLE_HF_TRANSFER=1
 
-USER root
+USER user
 ENV DEVICE=0
 ENV VRAM_MODE=--normalvram
 ENV WARMUP=false
