@@ -16,9 +16,10 @@ RUN apt-get update && apt-get install -y wget git
 # Installing Miniconda
 RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
     && chmod 700 Miniconda3-latest-Linux-x86_64.sh \
-    && ./Miniconda3-latest-Linux-x86_64.sh -b \
+    && ./Miniconda3-latest-Linux-x86_64.sh -b -p /home/user/miniconda3 \
     && rm Miniconda3-latest-Linux-x86_64.sh
-
+    
+ENV PATH="/home/user/miniconda3/bin:$PATH"
 ENV PATH="/user/miniconda3/bin:${PATH}"
 RUN conda create -n venv_image python=3.10.13 -y
 ENV PATH="/user/miniconda3/envs/venv_image/bin:${PATH}"
