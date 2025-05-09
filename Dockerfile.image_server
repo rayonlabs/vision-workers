@@ -1,7 +1,5 @@
 FROM nvidia/cuda:11.8.0-devel-ubuntu20.04
-
 WORKDIR /app
-
 ENV DEBIAN_FRONTEND=noninteractive
 
 # PM2
@@ -13,24 +11,35 @@ RUN apt-get update && apt-get install -y curl \
 # Installing necessary packages
 RUN apt-get update && apt-get install -y wget git
 
+# Create user
+RUN useradd -m -s /bin/bash user && \
+    mkdir -p /home/user && \
+    chown -R user:user /home/user && \
+    chmod 755 /home/user
+
 # Installing Miniconda
 RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
     && chmod 700 Miniconda3-latest-Linux-x86_64.sh \
-    && ./Miniconda3-latest-Linux-x86_64.sh -b -p /home/user/miniconda3 \
-    && rm Miniconda3-latest-Linux-x86_64.sh
-    
-ENV PATH="/home/user/miniconda3/bin:$PATH"
-ENV PATH="/user/miniconda3/bin:${PATH}"
-RUN conda create -n venv_image python=3.10.13 -y
-ENV PATH="/user/miniconda3/envs/venv_image/bin:${PATH}"
+    && bash Miniconda3-latest-Linux-x86_64.sh -b -p /home/user/miniconda3 \
+    && rm Miniconda3-latest-Linux-x86_64.sh \
+    && chown -R user:user /home/user/miniconda3
 
+ENV PATH="/home/user/miniconda3/bin:${PATH}"
+
+# Switch to user for conda operations
+USER user
+RUN conda create -n venv_image python=3.10.13 -y
+ENV PATH="/home/user/miniconda3/envs/venv_image/bin:${PATH}"
+
+# Switch back to root for system installations
+USER root
 RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get -y full-upgrade \
     && apt-get -y install python3-dev \
     && apt-get install -y --no-install-recommends \
     build-essential \
-    python3-pip\
+    python3-pip \
     apt-utils \
     curl \
     wget \
@@ -49,34 +58,39 @@ RUN apt-get update \
 
 RUN apt-get update && apt-get install -y unzip
 
-COPY image_server/requirements.txt /app/requirements.txt
-RUN pip install --upgrade pip \
-    && pip install --upgrade pip setuptools==69.5.1 \
-    && pip install -r /app/requirements.txt  \
-    && pip install huggingface_hub[hf_transfer] \
-    && rm -rf /user/.cache/pip/* 
-
-COPY image_server /app/image_server
-
-ENV APP_HOST=0.0.0.0
-ENV APP_PORT=8080
-ENV HF_HUB_ENABLE_HF_TRANSFER=1
-
+# Copy requirements and install packages as user
+COPY --chown=user:user image_server/requirements.txt /app/requirements.txt
 USER user
-ENV DEVICE=0
-ENV VRAM_MODE=--normalvram
-ENV WARMUP=false
+RUN /home/user/miniconda3/envs/venv_image/bin/pip install --upgrade pip \
+    && /home/user/miniconda3/envs/venv_image/bin/pip install --upgrade setuptools==69.5.1 \
+    && /home/user/miniconda3/envs/venv_image/bin/pip install -r /app/requirements.txt \
+    && /home/user/miniconda3/envs/venv_image/bin/pip install huggingface_hub[hf_transfer] \
+    && rm -rf /home/user/.cache/pip/*
 
-RUN chmod +x /app/image_server/entrypoint.sh
-RUN chmod +x /app/image_server/setup.sh
+USER root
+# Copy application files
+COPY --chown=user:user image_server /app/image_server
 
-RUN mkdir /app/cache \
-    && mkdir /app/cache/hub \
+# Set permissions
+RUN chmod +x /app/image_server/entrypoint.sh \
+    && chmod +x /app/image_server/setup.sh
+
+# Create cache directories and set permissions
+RUN mkdir -p /app/cache/hub \
+    && chown -R user:user /app \
     && chmod -R 777 /app/cache \
     && chmod -R 777 /app/cache/hub
 
+# Set environment variables
+ENV APP_HOST=0.0.0.0
+ENV APP_PORT=8080
+ENV HF_HUB_ENABLE_HF_TRANSFER=1
+ENV DEVICE=0
+ENV VRAM_MODE=--normalvram
+ENV WARMUP=false
 ENV HF_HOME=/app/cache
 ENV HF_HUB_CACHE=/app/cache/hub
 
-
+# Switch to user for running the application
+USER user
 CMD ["sh", "-c", "cd /app/image_server && ./entrypoint.sh"]
