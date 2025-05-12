@@ -240,7 +240,7 @@ async def calculate_distance_for_token_vlm(
         return 1
     else:
         distance = min(abs(math.exp(found_entry["logprob"]) - math.exp(chat_responses[index].logits.logprob)), 1)
-        logger.info(f"token: {text} - logprob : {chat_responses[index].logprob}")
+        logger.info(f"token: {text} - logprob : {chat_responses[index].logits.logprob}")
         logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
 
     return distance
