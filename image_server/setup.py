@@ -86,7 +86,7 @@ def main():
 
     logger.info("Downloading ae.safetensors")
     download_file(
-        repo_id="black-forest-labs/FLUX.1-schnell",
+        repo_id="tripathiarpan20/FLUX.1-schnell",
         filename="ae.safetensors",
         local_dir="ComfyUI/models/vae",
         cache_dir="ComfyUI/models/caches",
@@ -94,7 +94,7 @@ def main():
 
     logger.info("Downloading flux1-schnell.safetensors")
     download_file(
-        repo_id="black-forest-labs/FLUX.1-schnell",
+        repo_id="tripathiarpan20/FLUX.1-schnell",
         filename="flux1-schnell.safetensors",
         local_dir="ComfyUI/models/unet",
         cache_dir="ComfyUI/models/caches",

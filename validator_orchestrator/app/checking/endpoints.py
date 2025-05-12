@@ -39,15 +39,23 @@ def _get_llm_server_docker_flags(task_config: models.OrchestratorServerConfig) -
     flags += f" --gpu_memory_utilization {load_model_config.get('gpu_memory_utilization', 0.7)}"
     flags += f" --tensor-parallel-size {load_model_config.get('tensor_parallel_size', 1)}"
     flags += f" --num-scheduler-steps {load_model_config.get('num_scheduler_steps', 1)}"
+
+    if load_model_config.get("limit_mm_per_prompt", None):
+        flags += f" --limit-mm-per-prompt image={load_model_config['limit_mm_per_prompt']}"
+
     flags += " --port 6919 --enable-chunked-prefill"
 
-    
     if load_model_config.get("revision", None):
         flags += f" --revision {load_model_config['revision']}"
+
+    if load_model_config.get("max_num_batched_tokens", None):
+        flags += f" --max-num-batched-tokens {load_model_config['max_num_batched_tokens']}"
 
     if load_model_config.get('half_precision', True):
         flags += " --dtype half"
 
+    if load_model_config.get('trust_remote_code', False):
+        flags += " --trust-remote-code"
 
     return flags
 

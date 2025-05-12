@@ -52,7 +52,9 @@ class OrchestratorServerConfig(BaseModel):
                 "tokenizer": "tau-vision/llama-tokenizer-fix",
                 "max_model_len": 16000,
                 "gpu_memory_utilization": 0.6,
-                "eos_token_id": 128009
+                "eos_token_id": 128009,
+                "trust_remote_code": True,
+                "limit_mm_per_prompt": 2
             },
             None,
         ]
@@ -68,6 +70,10 @@ class CheckResultsRequest(BaseModel):
     payload: dict
 
 
+class VlmMessage(BaseModel):
+    role: str
+    content: List[Dict[str, Union[str, Dict]]]
+
 class Message(BaseModel):
     role: str
     content: str
@@ -82,11 +88,10 @@ class MessageResponse(BaseModel):
 
 
 class ChatRequestModel(BaseModel):
-    messages: list[Message]
+    messages: list[Message | VlmMessage]
     seed: int
     temperature: float
     max_tokens: int
-    starting_assistant_message: bool
     top_p: float = 1
 
 class CompletionRequestModel(BaseModel):

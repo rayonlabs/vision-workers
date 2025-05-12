@@ -5,6 +5,7 @@ from loguru import logger
 import httpx
 from typing import List, Dict, Any, Tuple, Union
 import math
+import copy
 
 BASE_URL = "http://llm_server:6919".rstrip("/")
 
@@ -23,7 +24,7 @@ MAX_CHECKS = 5
 DEFAULT_NUM_LOGPROBS = 20
 DEFAULT_PROMPT_LOGPROBS = 1 #vllm 0.8.3 breaks at some arbitrary prompt_logprobs > 1: https://github.com/vllm-project/vllm/issues/16836 
 
-MODELS_FOR_EOT_HANDLING = ["llama-3", "deepseek-r1", "qwq-32b", "qwen2.5-7b"]
+MODELS_FOR_EOT_HANDLING = ["llama-3", "deepseek-r1", "qwq-32b", "qwen2.5-7b", "qwen3"]
 
 
 def _score_average_distance(average_distance: float) -> float:
@@ -47,6 +48,9 @@ def _extract_completions_message(idx: int, response: dict) -> models.MessageResp
 
     text_token = logprobs["tokens"][0]
     logprob = logprobs["token_logprobs"][0]
+    if content in logprobs["top_logprobs"][0]:
+        logprob = logprobs["top_logprobs"][0][content]
+
     return models.MessageResponse(content=content, logits=models.LogitResponse(text_token=text_token, logprob=logprob))
 
 
@@ -126,7 +130,7 @@ async def query_endpoint_with_status(
     data: Dict[str, Any],
     base_url: str = BASE_URL
 ) -> Tuple[Union[Dict[str, Any], None], int]:
-    url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+    url = f"{base_url.rstrip('/')}/v1/{endpoint.lstrip('/')}"
     
     async with httpx.AsyncClient(timeout=SHORT_TIMEOUT) as client:
         logger.info(f"Querying: {url}")
@@ -173,6 +177,73 @@ async def _process_think_tags_deepseek(prompt: str, messages: list[dict]) -> str
     
     return prompt[:insert_pos] + think_content + prompt[insert_pos:]
 
+
+async def calculate_distance_for_token_vlm(
+    task_config: models.OrchestratorServerConfig,
+    llm_request: models.ChatRequestModel,
+    chat_responses: List[models.MessageResponse],
+    index: int,
+    starting_assistant_message: bool,
+    is_last_token: bool,
+    must_output_eos: bool
+) -> float:
+
+    messages = llm_request.messages
+    messages = [msg.model_dump() if hasattr(msg, 'model_dump') else msg for msg in messages]
+
+    chat_completions_payload = {
+        "messages": messages,
+        "model": task_config.load_model_config["model"],
+        "temperature": llm_request.temperature,
+        "top_p": 1,
+        "max_tokens": 1,
+        "logprobs": True,
+        "top_logprobs": 20,
+        "add_generation_prompt": starting_assistant_message,
+        "continue_final_message": not starting_assistant_message,
+        "add_special_tokens": False
+    }
+    try:
+        validator_checking_response = await make_api_call(chat_completions_payload, endpoint=f"{BASE_URL}/v1/chat/completions")
+    except json.JSONDecodeError as e:
+        logger.error(f"Error decoding JSON in calculate_distance_for_token_vlm: {e}. Response: {validator_checking_response}")
+        return 1
+    except httpx.RequestError as e:
+        logger.error(f"Request failed in calculate_distance_for_token_vlm: {e}")
+        return 1
+
+    logger.info(f"chat completion payload: \n{json.dumps(chat_completions_payload, indent=2)}\n")
+    logger.info(f"validator_checking_response: \n{json.dumps(validator_checking_response, indent=2)}\n")
+    logger.info(f"chat_responses: \n{json.dumps([response.dict() for response in chat_responses[max(0, index-5):index+3]], indent=2)}\n")
+    logger.info(f"focus token in response: \n{json.dumps(chat_responses[index].dict(), indent=2)}\n")
+
+    text = chat_responses[index].content
+
+    # VLLM_USE_V1=0
+    validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["content"][0]["top_logprobs"]
+
+    # VLLM_USE_V1=0
+    found_entry = next((entry for entry in validator_log_probs_for_token if entry["token"] == text), None)
+
+    # Handle case of prompt_logprobs outputting |eot| token but miner response including "" output
+    if is_last_token and must_output_eos:
+        if text != "":
+            logger.info(f"token: `{text}` at last index doesn't correspond to eos "" output by miners")
+            logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
+            return 1
+        eos_token = validator_checking_response["choices"][0]["logprobs"]["content"][0]["token"]
+        found_entry = next((entry for entry in validator_log_probs_for_token if entry["token"] == eos_token), None)
+
+    if not found_entry:
+        logger.info(f"token: {text} - not found in vali logprobs")
+        logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
+        return 1
+    else:
+        distance = min(abs(math.exp(found_entry["logprob"]) - math.exp(chat_responses[index].logprob)), 1)
+        logger.info(f"token: {text} - logprob : {chat_responses[index].logprob}")
+        logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
+
+    return distance
 
 async def calculate_distance_for_token(
     task_config: models.OrchestratorServerConfig,
@@ -329,14 +400,24 @@ async def _validate_tokens(all_tokens: List, num_input_tokens: int, messages: Li
             return True, "Token not found in logprobs", failed_tokens_idx
 
         if str(eos_token_id) in logprobs and str(response_token) != str(eos_token_id):
-            logprob = logprobs[str(eos_token_id)]["logprob"]
+            eos_logprob = logprobs[str(eos_token_id)]["logprob"]
             response_logprob = logprobs[str(response_token)]["logprob"]
             
             if response_logprob == float("-inf"):
                 return True, "You really went out your way to avoid stopping!", failed_tokens_idx
             
-            if logprob > float("-inf") and math.exp(logprob) / math.exp(response_logprob) > 100:
-                return True, "You really went out your way to avoid stopping!", failed_tokens_idx
+            if eos_logprob > float("-inf"):
+                try:
+                    if response_logprob > float("-inf"):
+                        prob_ratio = math.exp(eos_logprob) / math.exp(response_logprob)
+                        if prob_ratio > 100:
+                            return True, "You really went out your way to avoid stopping!", failed_tokens_idx
+                    else:
+                        pass
+
+                except (ZeroDivisionError, OverflowError):
+                    logger.warning("Math error when comparing token probabilities")
+                    return True, "You really went out your way to avoid stopping!", failed_tokens_idx
 
     return False, "", failed_tokens_idx
 
@@ -402,9 +483,13 @@ async def _perform_token_checks(task_config, payload, messages, indices_to_check
 async def check_text_result(result: models.QueryResult, payload: dict, task_config: models.OrchestratorServerConfig) -> Union[float, None]:
     if result.formatted_response is None:
         miner_status_code = result.status_code
+        payload["model"] = task_config.load_model_config["model"]
         _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
         logger.info(f"miner status code: {miner_status_code} - vali status code : {vali_status_code}")
-        return 1 if str(vali_status_code[0]) == str(miner_status_code[0]) else -3
+        if type(vali_status_code) is int:
+            return 1 if str(vali_status_code) == str(miner_status_code) else -3
+        else:
+            return 1 if str(vali_status_code[0]) == str(miner_status_code[0]) else -3
     
     formatted_response = json.loads(result.formatted_response) if isinstance(result.formatted_response, str) else result.formatted_response
     is_completions_payload = _payload_is_completions(payload)
@@ -489,3 +574,178 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     payload["starting_assistant_message"] = True
     
     return await _perform_token_checks(task_config, payload, messages, indices_to_check)
+
+async def check_vlm_result(result: models.QueryResult, payload: dict, task_config: models.OrchestratorServerConfig) -> Union[float, None]:
+    if result.formatted_response is None:
+        miner_status_code = result.status_code
+        payload["model"] = task_config.load_model_config["model"]
+        _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
+        logger.info(f"miner status code: {miner_status_code} - vali status code : {vali_status_code}")
+        if type(vali_status_code) is int:
+            return 1 if str(vali_status_code) == str(miner_status_code) else -3
+        else:
+            return 1 if str(vali_status_code[0]) == str(miner_status_code[0]) else -3
+    
+    formatted_response = json.loads(result.formatted_response) if isinstance(result.formatted_response, str) else result.formatted_response
+    
+    messages = await _extract_messages(formatted_response, is_completions_payload=False)
+    if not messages:
+        logger.error("No valid messages in response.")
+        return 0.0
+
+    if len(messages) > payload["max_tokens"]:
+        logger.error("Number of messages is greater than max_tokens, skipping logprob check, returning 0")
+        return 0.0
+
+    full_response_content = "".join([message.content for message in messages])
+    eos_token_id = task_config.load_model_config.get("eos_token_id", 128009)
+    
+    input_chat_content = payload[MESSAGES_KEY]
+    must_output_eos = False
+    eos_token = await _detokenize([eos_token_id], task_config.load_model_config["model"])
+    
+    if len(messages) != payload["max_tokens"] and full_response_content[-len(eos_token):] != eos_token:
+        full_response_content += eos_token
+        must_output_eos = True
+
+    input_chat_content_w_response = input_chat_content.copy()
+    input_chat_content_w_response.append({"role": "assistant", "content": full_response_content})
+
+    chat_completions_payload = {
+        "messages": input_chat_content_w_response,
+        "model": task_config.load_model_config["model"],
+        "temperature": payload["temperature"],
+        "max_tokens": 1,
+        "add_generation_prompt": False,
+        "continue_final_message": True,
+        "prompt_logprobs": DEFAULT_PROMPT_LOGPROBS,
+        "add_special_tokens": False
+    }
+
+    logger.info(f"chat_completions_payload for checks: \n{json.dumps(chat_completions_payload, indent=2)}\n")
+
+    try:
+        result = await make_api_call(chat_completions_payload, endpoint=f"{BASE_URL}/v1/chat/completions")
+    except (httpx.RequestError, json.JSONDecodeError) as e:
+        logger.exception(e)
+        logger.error(f"API call failed: {e}")
+        return 0.9876
+    
+    n_generated_tokens = len(messages)
+    
+    prompt_logprobs = result["prompt_logprobs"][-n_generated_tokens:]
+    logger.info(f"prompt_logprobs : {json.dumps(prompt_logprobs[:2], indent=2)}")
+    
+    failed_tokens_idx = []
+    failed_tokens_details = []
+    max_acceptable_rank = 10 if payload["temperature"] <= 0.5 else int(10 / (1.03 - payload["temperature"]))
+    
+    for idx, response_obj, logprobs_entry in zip(range(len(messages)), messages, prompt_logprobs):
+        nice_logprobs = json.dumps(logprobs_entry, indent=2, sort_keys=True, ensure_ascii=False)
+        additional_log = f" (decoded: '{response_obj.content}', logprob: {response_obj.logprob})"
+        
+        token_found = False
+        for token_id, info in logprobs_entry.items():
+            if info.get("decoded_token") == response_obj.content:
+                token_found = True
+                logprob = info["logprob"]
+                rank = info["rank"]
+                
+                if rank < max_acceptable_rank and logprob > float("-inf"):
+                    logger.info(f"Token {response_obj.content} {additional_log} in logprobs with good behaviour; rank: {rank}, logprob: {logprob} ✅")
+                else:
+                    logger.error(f"Token {response_obj.content} {additional_log} in logprobs with bad behaviour; rank: {rank}, logprob: {logprob} ❌")
+                    failed_tokens_idx.append(idx)
+                    failed_tokens_details.append((response_obj.content, rank, logprob, additional_log))
+                    
+                    if len(failed_tokens_idx) > MAX_FAILED_TOKENS:
+                        failed_tokens_details = json.dumps(failed_tokens_details, indent=2, sort_keys=True, ensure_ascii=False)
+                        fail_reason = f"Too many bad tokens found ('response_token', 'rank', 'logprob', 'additional_log'):\n{failed_tokens_details}"
+                        return 0.0
+                break
+        
+        if not token_found:
+            logger.error(f"Token {response_obj.content} {additional_log} not found in logprobs :(")
+            logger.info(f"logprobs_entry : {logprobs_entry}")
+            return 0.0
+            
+        eos_token_key = None
+        for token_id, info in logprobs_entry.items():
+            if int(token_id) == eos_token_id:
+                eos_token_key = token_id
+                break
+                
+        if eos_token_key and response_obj.content != eos_token:
+            eos_logprob = logprobs_entry[eos_token_key]["logprob"]
+            response_token_key = next((k for k, v in logprobs_entry.items() if v.get("decoded_token") == response_obj.content), None)
+            
+            if response_token_key:
+                response_logprob = logprobs_entry[response_token_key]["logprob"]
+                if eos_logprob > float("-inf") and math.exp(eos_logprob) / math.exp(response_logprob) > 100:
+                    return 0.0
+    
+    logger.info("All tokens found in prompt_logprobs! ✅")
+    
+    indices_to_check = [0, len(messages) - 1] if len(messages) > 1 else [0]
+    
+    if failed_tokens_idx:
+        indices_to_check += failed_tokens_idx[:3]
+        
+    remaining_indexes = list(set(range(0, len(messages))) - set(indices_to_check))
+    number_of_additional_indices_to_check = min(MAX_CHECKS - len(indices_to_check), len(messages) - 2)
+    
+    if remaining_indexes and number_of_additional_indices_to_check > 0:
+        additional_indices_to_check = random.sample(
+            remaining_indexes,
+            number_of_additional_indices_to_check,
+        )
+        indices_to_check.extend(additional_indices_to_check)
+        
+    logger.info(f"failed token indexes: {failed_tokens_idx}")
+    logger.info(f"logprobs indexes to check: {indices_to_check}")
+    
+    total_distance = 0
+    checks = 0
+    
+    llm_request = models.ChatRequestModel(**payload)
+    llm_request.max_tokens = 1
+    
+    for i, index in enumerate(indices_to_check):
+        if checks >= MAX_CHECKS:
+            break
+            
+        starting_assistant_message = i == 0
+        if index > 0:
+            text_to_inject_into_assistant_message = "".join([i.content for i in messages[:index]])
+            llm_request.messages.append(
+                models.Message(
+                    **{
+                        "role": "assistant",
+                        "content": text_to_inject_into_assistant_message,
+                    }
+                )
+            )
+            
+        logger.info(f"index: {index} - token: {messages[index].content}")
+        distance = await calculate_distance_for_token_vlm(
+            task_config, 
+            llm_request, 
+            messages, 
+            index, 
+            starting_assistant_message,
+            index == (len(messages) - 1),
+            must_output_eos
+        )
+        checks += 1
+        total_distance += distance
+        
+        if index != 0:
+            llm_request.messages = llm_request.messages[:-1]
+            
+    try:
+        average_distance = total_distance / checks
+    except Exception as e:
+        logger.error(f"Error with average distance: {e}. Total distance: {total_distance}. Checks: {checks}")
+        return 0
+        
+    return _score_average_distance(average_distance)
