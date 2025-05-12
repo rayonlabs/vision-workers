@@ -642,7 +642,7 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
     
     for idx, response_obj, logprobs_entry in zip(range(len(messages)), messages, prompt_logprobs):
         nice_logprobs = json.dumps(logprobs_entry, indent=2, sort_keys=True, ensure_ascii=False)
-        additional_log = f" (decoded: '{response_obj.content}', logprob: {response_obj.logprob})"
+        additional_log = f" (decoded: '{response_obj.content}', logprob: {response_obj.logits.logprob})"
         
         token_found = False
         for token_id, info in logprobs_entry.items():
