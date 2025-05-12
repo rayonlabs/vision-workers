@@ -371,13 +371,13 @@ async def _get_full_prompt(is_completions_payload, payload, messages, task_confi
         return full_prompt, all_tokens, num_input_tokens
 
 
-async def _validate_tokens(all_tokens: List, num_input_tokens: int, messages: List[models.MessageResponse], prompt_logprobs: List[Dict[str, Any]], payload: Dict, eos_token_id: int):
+async def _validate_tokens(out_tokens: List, messages: List[models.MessageResponse], prompt_logprobs: List[Dict[str, Any]], payload: Dict, eos_token_id: int):
     failed_tokens_idx = []
     failed_tokens_details = []
     max_acceptable_rank = 10 if payload["temperature"] <= 0.5 else int(10 / (1.03 - payload["temperature"]))
 
     logger.info(f"prompt_logprobs : {json.dumps(prompt_logprobs[:2], indent=2)}")
-    for idx, response_token, logprobs in zip(range(len(all_tokens[num_input_tokens:])), all_tokens[num_input_tokens:], prompt_logprobs):
+    for idx, response_token, logprobs in zip(range(len(out_tokens)), out_tokens, prompt_logprobs):
         nice_logprobs = json.dumps(logprobs, indent=2, sort_keys=True, ensure_ascii=False)
         additional_log = f" (decoded: '{messages[idx].content}', logprob: {messages[idx].logits.logprob})" if idx <= len(messages) - 1 else ""
 
@@ -539,8 +539,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     prompt_logprobs = result["choices"][0]["prompt_logprobs"][num_input_tokens:]
     
     bad_token_found, fail_reason, failed_tokens_idx = await _validate_tokens(
-        all_tokens, 
-        num_input_tokens, 
+        all_tokens[num_input_tokens:],
         messages, 
         prompt_logprobs, 
         payload,
@@ -609,6 +608,8 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         full_response_content += eos_token
         must_output_eos = True
 
+    out_tokens = _tokenize(full_response_content, task_config.load_model_config["model"], add_special_tokens=False)
+
     input_chat_content_w_response = input_chat_content.copy()
     input_chat_content_w_response.append({"role": "assistant", "content": full_response_content})
 
@@ -641,54 +642,19 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
     prompt_logprobs = result["prompt_logprobs"][-n_generated_tokens:]
     logger.info(f"prompt_logprobs : {json.dumps(prompt_logprobs[:2], indent=2)}")
     
-    failed_tokens_idx = []
-    failed_tokens_details = []
-    max_acceptable_rank = 10 if payload["temperature"] <= 0.5 else int(10 / (1.03 - payload["temperature"]))
+    bad_token_found, fail_reason, failed_tokens_idx = await _validate_tokens(
+        out_tokens,
+        messages, 
+        prompt_logprobs, 
+        payload,
+        task_config.load_model_config['eos_token_id']
+    )
     
-    for idx, response_obj, logprobs_entry in zip(range(len(messages)), messages, prompt_logprobs):
-        nice_logprobs = json.dumps(logprobs_entry, indent=2, sort_keys=True, ensure_ascii=False)
-        additional_log = f" (decoded: '{response_obj.content}', logprob: {response_obj.logits.logprob})"
-        
-        token_found = False
-        for token_id, info in logprobs_entry.items():
-            if info.get("decoded_token") == response_obj.content:
-                token_found = True
-                logprob = info["logprob"]
-                rank = info["rank"]
-                
-                if rank < max_acceptable_rank and logprob > float("-inf"):
-                    logger.info(f"Token {response_obj.content} {additional_log} in logprobs with good behaviour; rank: {rank}, logprob: {logprob} ✅")
-                else:
-                    logger.error(f"Token {response_obj.content} {additional_log} in logprobs with bad behaviour; rank: {rank}, logprob: {logprob} ❌")
-                    failed_tokens_idx.append(idx)
-                    failed_tokens_details.append((response_obj.content, rank, logprob, additional_log))
-                    
-                    if len(failed_tokens_idx) > MAX_FAILED_TOKENS:
-                        failed_tokens_details = json.dumps(failed_tokens_details, indent=2, sort_keys=True, ensure_ascii=False)
-                        fail_reason = f"Too many bad tokens found ('response_token', 'rank', 'logprob', 'additional_log'):\n{failed_tokens_details}"
-                        return 0.0
-                break
-        
-        if not token_found:
-            logger.error(f"Token {response_obj.content} {additional_log} not found in logprobs :(")
-            logger.info(f"logprobs_entry : {logprobs_entry}")
-            return 0.0
-            
-        eos_token_key = None
-        for token_id, info in logprobs_entry.items():
-            if int(token_id) == eos_token_id:
-                eos_token_key = token_id
-                break
-                
-        if eos_token_key and response_obj.content != eos_token:
-            eos_logprob = logprobs_entry[eos_token_key]["logprob"]
-            response_token_key = next((k for k, v in logprobs_entry.items() if v.get("decoded_token") == response_obj.content), None)
-            
-            if response_token_key:
-                response_logprob = logprobs_entry[response_token_key]["logprob"]
-                if eos_logprob > float("-inf") and math.exp(eos_logprob) / math.exp(response_logprob) > 100:
-                    return 0.0
-    
+    if bad_token_found:
+        nice_logprobs = json.dumps(prompt_logprobs, indent=2, sort_keys=True, ensure_ascii=False)
+        logger.error(f"Bad token (s) found at indexes {failed_tokens_idx}." f" Prompt logprobs: {nice_logprobs}" f" Reason: {fail_reason}")
+        return 0.0
+
     logger.info("All tokens found in prompt_logprobs! ✅")
     
     indices_to_check = [0, len(messages) - 1] if len(messages) > 1 else [0]
