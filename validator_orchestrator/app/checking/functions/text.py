@@ -376,6 +376,7 @@ async def _validate_tokens(all_tokens: List, num_input_tokens: int, messages: Li
     failed_tokens_details = []
     max_acceptable_rank = 10 if payload["temperature"] <= 0.5 else int(10 / (1.03 - payload["temperature"]))
 
+    logger.info(f"prompt_logprobs : {json.dumps(prompt_logprobs[:2], indent=2)}")
     for idx, response_token, logprobs in zip(range(len(all_tokens[num_input_tokens:])), all_tokens[num_input_tokens:], prompt_logprobs):
         nice_logprobs = json.dumps(logprobs, indent=2, sort_keys=True, ensure_ascii=False)
         additional_log = f" (decoded: '{messages[idx].content}', logprob: {messages[idx].logits.logprob})" if idx <= len(messages) - 1 else ""
@@ -619,7 +620,11 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         "add_generation_prompt": False,
         "continue_final_message": True,
         "prompt_logprobs": DEFAULT_PROMPT_LOGPROBS,
-        "add_special_tokens": False
+        "add_special_tokens": False,
+        "logprobs": True,
+        "top_k": -1,
+        "top_p": 1,
+        "stream": False
     }
 
     logger.info(f"chat_completions_payload for checks: \n{json.dumps(chat_completions_payload, indent=2)}\n")
