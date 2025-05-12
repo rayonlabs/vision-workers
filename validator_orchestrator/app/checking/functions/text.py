@@ -229,7 +229,7 @@ async def calculate_distance_for_token_vlm(
 
     # Handle case of prompt_logprobs outputting |eot| token but miner response including "" output
     if is_last_token and must_output_eos:
-        if text != "":
+        if chat_responses[index].content != "":
             logger.info(f"token: `{text}` at last index doesn't correspond to eos "" output by miners")
             logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
             return 1
