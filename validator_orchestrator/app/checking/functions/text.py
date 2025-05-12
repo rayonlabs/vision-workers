@@ -608,7 +608,7 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         full_response_content += eos_token
         must_output_eos = True
 
-    out_tokens = _tokenize(full_response_content, task_config.load_model_config["model"], add_special_tokens=False)
+    out_tokens = await _tokenize(full_response_content, task_config.load_model_config["model"], add_special_tokens=False)
 
     input_chat_content_w_response = input_chat_content.copy()
     input_chat_content_w_response.append({"role": "assistant", "content": full_response_content})
