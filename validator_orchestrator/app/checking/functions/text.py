@@ -217,7 +217,9 @@ async def calculate_distance_for_token_vlm(
     logger.info(f"chat_responses: \n{json.dumps([response.dict() for response in chat_responses[max(0, index-5):index+3]], indent=2)}\n")
     logger.info(f"focus token in response: \n{json.dumps(chat_responses[index].dict(), indent=2)}\n")
 
-    text = chat_responses[index].content
+    # tweaked when upgrading vllm 0.6.4.post1 to 0.8.5.post1 due to `\u0120` being present in upgraded version, https://gist.github.com/tripathiarpan20/f742eacd9f462656c10ce202bbb86dde
+    # text = chat_responses[index].content
+    text = chat_responses[index].logits.text_token
 
     # VLLM_USE_V1=0
     validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["content"][0]["top_logprobs"]
@@ -294,7 +296,7 @@ async def calculate_distance_for_token(
     logger.info(f"chat_responses: \n{json.dumps([response.dict() for response in chat_responses[max(0, index-5):index+3]], indent=2)}\n")
     logger.info(f"focus token in response: \n{json.dumps(chat_responses[index].dict(), indent=2)}\n")
 
-    # tweaked when upgrading vllm 0.6.4.post1 to 0.8.3 due to `\u0120` being present in upgraded version, https://gist.github.com/tripathiarpan20/f742eacd9f462656c10ce202bbb86dde
+    # tweaked when upgrading vllm 0.6.4.post1 to 0.8.5.post1 due to `\u0120` being present in upgraded version, https://gist.github.com/tripathiarpan20/f742eacd9f462656c10ce202bbb86dde
     #text = chat_responses[index].content
     text = chat_responses[index].logits.text_token
 
