@@ -560,7 +560,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     if failed_tokens_idx:
         indices_to_check += failed_tokens_idx[:3]
 
-    remaining_indexes = list(set(range(0, len(messages))) - set(indices_to_check))
+    remaining_indexes = list(set(range(0, len(messages) - 1)) - set(indices_to_check))
     number_of_additional_indices_to_check = min(5 - len(indices_to_check), len(messages) - 2)
     
     if remaining_indexes and number_of_additional_indices_to_check > 0:
