@@ -4,9 +4,10 @@ import json
 import random
 from loguru import logger
 import httpx
-from typing import List, Dict, Any, Tuple, Union
+from typing import List, Dict, Any, Tuple, Union, Optional
 import math
 import copy
+import os
 
 BASE_URL = "http://llm_server:6919".rstrip("/")
 
@@ -120,23 +121,32 @@ async def _completions_to_prompt(prompt: str, model_name: str, eos_token_id: int
     return await _tokenize_and_detokenize(input_payload, model_name, eos_token_id, add_generation_prompt)
 
 
-async def make_api_call(payload: dict, endpoint: str) -> dict:
+async def make_api_call(payload: dict, endpoint: str, auth_token: Optional[str] = None) -> dict:
+    headers = {}
+    if auth_token:
+        headers["Authorization"] = f"Bearer {auth_token}"
+    
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-        response = await client.post(endpoint, json=payload)
+        response = await client.post(endpoint, json=payload, headers=headers)
         return response.json()
 
 
 async def query_endpoint_with_status(
     endpoint: str,
     data: Dict[str, Any],
-    base_url: str = BASE_URL
+    base_url: str = BASE_URL,
+    auth_token: Optional[str] = None
 ) -> Tuple[Union[Dict[str, Any], None], int]:
     url = f"{base_url.rstrip('/')}/v1/{endpoint.lstrip('/')}"
     
+    headers = {}
+    if auth_token:
+        headers["Authorization"] = f"Bearer {auth_token}"
+
     async with httpx.AsyncClient(timeout=SHORT_TIMEOUT) as client:
         logger.info(f"Querying: {url}")
         try:
-            response = await client.post(url, json=data)
+            response = await client.post(url, json=data, headers=headers)
             logger.info(f"Status code: {response.status_code}")
             
             if response.status_code >= 400:
@@ -284,7 +294,11 @@ async def calculate_distance_for_token(
     }
     
     try:
-        validator_checking_response = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
+        if model_name in chutes_checking_supported_models:
+            logger.info(f"querying chutes for distance check at index {index}")
+            validator_checking_response = await make_api_call(completions_payload, endpoint=f"{CHUTES_BASE_URL}/v1/completions", auth_token=os.getenv("CHUTES_API_KEY", None))
+        else:
+            validator_checking_response = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
     except json.JSONDecodeError as e:
         logger.error(f"Error decoding JSON in calculate_distance_for_token: {e}. Response: {validator_checking_response}")
         return 1
@@ -490,7 +504,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         payload["model"] = task_config.load_model_config["model"]
         if payload["model"] in chutes_checking_supported_models:
             logger.info(f"querying chutes for checking model {payload['model']}")
-            _, vali_status_code = await query_endpoint_with_status(CHUTES_BASE_URL, payload)
+            _, vali_status_code = await query_endpoint_with_status(CHUTES_BASE_URL, payload, os.getenv("CHUTES_API_KEY", None))
             logger.info(f"chutes status code: {vali_status_code}")
         else:
             _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
@@ -539,7 +553,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
 
     try:
         if payload["model"] in chutes_checking_supported_models:
-            result = await query_endpoint_with_status(completions_payload, endpoint=f"{CHUTES_BASE_URL}/v1/completions")
+            result = await make_api_call(completions_payload, endpoint=f"{CHUTES_BASE_URL}/v1/completions", auth_token=os.getenv("CHUTES_API_KEY", None))
         else:
             result = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
     except (httpx.RequestError, json.JSONDecodeError) as e:
@@ -649,7 +663,7 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
     try:
         if payload["model"] in chutes_checking_supported_models:
             logger.info(f"querying chutes for checking model {payload['model']}")
-            result = await make_api_call(chat_completions_payload, endpoint=f"{CHUTES_BASE_URL}/v1/chat/completions")
+            result = await make_api_call(chat_completions_payload, endpoint=f"{CHUTES_BASE_URL}/v1/chat/completions", auth_token = os.getenv("CHUTES_API_KEY", None))
             logger.info(f"chutes result: {result}")
         else:
             result = await make_api_call(chat_completions_payload, endpoint=f"{BASE_URL}/v1/chat/completions")
