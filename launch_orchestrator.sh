@@ -1,6 +1,7 @@
 #!/bin/bash
 ORCHESTRATOR_IMAGE="nineteenai/sn19:orchestrator-latest"
 IMAGE_SERVER_IMAGE="nineteenai/sn19:image_server-latest"
+CHUTES_API_KEY="CHUTES_API_KEY"
 PORT=6920
 REFRESH_LOCAL_IMAGES=1
 
@@ -26,6 +27,10 @@ while [[ "$#" -gt 0 ]]; do
     PORT="$2"
     shift
     ;;
+  --chutes-api-key)
+    CHUTES_API_KEY="$2"
+    shift
+    ;;
   --dont-refresh-local-images)
     REFRESH_LOCAL_IMAGES=0
     ;;
@@ -45,6 +50,7 @@ DOCKER_RUN_FLAGS="--rm \
                   -v /var/run/docker.sock:/var/run/docker.sock \
                   -e LLM_SERVER_DOCKER_IMAGE=$LLM_IMAGE \
                   -e IMAGE_SERVER_DOCKER_IMAGE=$IMAGE_SERVER_IMAGE \
+                  -e CHUTES_API_KEY=$CHUTES_API_KEY \
                   --network $NETWORK"
 
 # Add the --runtime=nvidia flag unless --no-runtime-flag is specified

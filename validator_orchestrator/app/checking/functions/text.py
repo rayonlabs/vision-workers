@@ -1,4 +1,5 @@
 from app.core import models
+from app.config import chutes_checking_supported_models, CHUTES_BASE_URL
 import json
 import random
 from loguru import logger
@@ -487,7 +488,12 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     if result.formatted_response is None:
         miner_status_code = result.status_code
         payload["model"] = task_config.load_model_config["model"]
-        _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
+        if payload["model"] in chutes_checking_supported_models:
+            logger.info(f"querying chutes for checking model {payload['model']}")
+            _, vali_status_code = await query_endpoint_with_status(CHUTES_BASE_URL, payload)
+            logger.info(f"chutes status code: {vali_status_code}")
+        else:
+            _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
         logger.info(f"miner status code: {miner_status_code} - vali status code : {vali_status_code}")
         if type(vali_status_code) is int:
             return 1 if str(vali_status_code) == str(miner_status_code) else -3
@@ -532,7 +538,10 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     logger.info(f"completions_payload for checks: \n{json.dumps(completions_payload, indent=2)}\n")
 
     try:
-        result = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
+        if payload["model"] in chutes_checking_supported_models:
+            result = await query_endpoint_with_status(completions_payload, endpoint=f"{CHUTES_BASE_URL}/v1/completions")
+        else:
+            result = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
     except (httpx.RequestError, json.JSONDecodeError) as e:
         logger.exception(e)
         logger.error(f"API call failed: {e}")
@@ -581,7 +590,12 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
     if result.formatted_response is None:
         miner_status_code = result.status_code
         payload["model"] = task_config.load_model_config["model"]
-        _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
+        if payload["model"] in chutes_checking_supported_models:
+            logger.info(f"querying chutes for checking model {payload['model']}")
+            _, vali_status_code = await query_endpoint_with_status(CHUTES_BASE_URL, payload)
+            logger.info(f"chutes status code: {vali_status_code}")
+        else:
+            _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
         logger.info(f"miner status code: {miner_status_code} - vali status code : {vali_status_code}")
         if type(vali_status_code) is int:
             return 1 if str(vali_status_code) == str(miner_status_code) else -3
@@ -633,7 +647,10 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
     logger.info(f"chat_completions_payload for checks: \n{json.dumps(chat_completions_payload, indent=2)}\n")
 
     try:
-        result = await make_api_call(chat_completions_payload, endpoint=f"{BASE_URL}/v1/chat/completions")
+        if payload["model"] in chutes_checking_supported_models:
+            result = await make_api_call(chat_completions_payload, endpoint=f"{CHUTES_BASE_URL}/v1/chat/completions")
+        else:
+            result = await make_api_call(chat_completions_payload, endpoint=f"{BASE_URL}/v1/chat/completions")
     except (httpx.RequestError, json.JSONDecodeError) as e:
         logger.exception(e)
         logger.error(f"API call failed: {e}")

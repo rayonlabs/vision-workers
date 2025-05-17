@@ -11,6 +11,7 @@ import traceback
 from datetime import datetime
 from app.checking.task_manager import task_manager
 from app.settings import settings
+from app.config import chutes_checking_supported_models
 import asyncio
 
 router = APIRouter(
@@ -99,17 +100,20 @@ async def process_check_result(
 
             load_model_config = task_config.load_model_config
 
-            flags = _get_llm_server_docker_flags(task_config)
-            load_model_config["extra-docker-flags"] = flags
-            await server_manager.start_server(server_needed, load_model_config)
+            if load_model_config["model"] in chutes_checking_supported_models:
+                logger.info(f"Chutes worker match found for model {load_model_config['model']}, not booting up a local llm worker")
+            else:
+                flags = _get_llm_server_docker_flags(task_config)
+                load_model_config["extra-docker-flags"] = flags
+                await server_manager.start_server(server_needed, load_model_config)
 
-            if load_model_config is not None:
-                # TODO: Why is this needed? Slows down checking *alot*
-                # if task_manager.last_task_type != task_config.task:
-                #     load_model_config_dumped["force_reload"] = True
-                if server_needed != models.ServerType.LLM:
-                    # TODO: I'm pretty sure no one uses this any more lol
-                    await server_manager.load_model(load_model_config, server_name=server_needed.value)
+                if load_model_config is not None:
+                    # TODO: Why is this needed? Slows down checking *alot*
+                    # if task_manager.last_task_type != task_config.task:
+                    #     load_model_config_dumped["force_reload"] = True
+                    if server_needed != models.ServerType.LLM:
+                        # TODO: I'm pretty sure no one uses this any more lol
+                        await server_manager.load_model(load_model_config, server_name=server_needed.value)
 
             task_manager.last_task_type = task_config.task
 

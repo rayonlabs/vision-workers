@@ -45,7 +45,11 @@ checking_server_configs: list[CheckingServerConfig] = [
     ),
 ]
 
-
+CHUTES_BASE_URL = "https://llm.chutes.ai"
+chutes_checking_supported_models = [
+    "OpenGVLab/InternVL3-2B",
+    "cognitivecomputations/Qwen3-235B-A22B-AWQ"
+]
 def get_checking_server_config(server_type: ServerType) -> CheckingServerConfig | None:
     for worker_config in checking_server_configs:
         if worker_config.name == server_type.value:
