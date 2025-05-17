@@ -505,7 +505,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         payload["model"] = task_config.load_model_config["model"]
         if payload["model"] in chutes_checking_supported_models:
             logger.info(f"querying chutes for checking model {payload['model']}")
-            _, vali_status_code = await query_endpoint_with_status(CHUTES_BASE_URL, payload, os.getenv("CHUTES_API_KEY", None))
+            _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload, CHUTES_BASE_URL, os.getenv("CHUTES_API_KEY", None))
             logger.info(f"chutes status code: {vali_status_code}")
         else:
             _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
@@ -607,7 +607,7 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
         payload["model"] = task_config.load_model_config["model"]
         if payload["model"] in chutes_checking_supported_models:
             logger.info(f"querying chutes for checking model {payload['model']}")
-            _, vali_status_code = await query_endpoint_with_status(CHUTES_BASE_URL, payload)
+            _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload, CHUTES_BASE_URL, os.getenv("CHUTES_API_KEY", None))
             logger.info(f"chutes status code: {vali_status_code}")
         else:
             _, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload)
