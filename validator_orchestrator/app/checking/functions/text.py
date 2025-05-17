@@ -73,7 +73,7 @@ def _extract_chat_message(idx: int, response: dict) -> Union[models.MessageRespo
 async def _tokenize(prompt: str, model: str, add_special_tokens: bool) -> list[int]:
     async with httpx.AsyncClient() as client:
         r = await client.post(
-            url=f"{BASE_URL}/tokenize", 
+            url=f"{CHUTES_BASE_URL if model in chutes_checking_supported_models else BASE_URL}/tokenize", 
             json={"model": model, "prompt": prompt, "add_special_tokens": add_special_tokens}
         )
         r.raise_for_status()
@@ -83,7 +83,7 @@ async def _tokenize(prompt: str, model: str, add_special_tokens: bool) -> list[i
 async def _detokenize(tokens: list[int], model: str) -> str:
     async with httpx.AsyncClient() as client:
         r = await client.post(
-            url=f"{BASE_URL}/detokenize", 
+            url=f"{CHUTES_BASE_URL if model in chutes_checking_supported_models else BASE_URL}/detokenize", 
             json={"tokens": tokens, "model": model}
         )
         r.raise_for_status()
