@@ -648,7 +648,9 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
 
     try:
         if payload["model"] in chutes_checking_supported_models:
+            logger.info(f"querying chutes for checking model {payload['model']}")
             result = await make_api_call(chat_completions_payload, endpoint=f"{CHUTES_BASE_URL}/v1/chat/completions")
+            logger.info(f"chutes result: {result}")
         else:
             result = await make_api_call(chat_completions_payload, endpoint=f"{BASE_URL}/v1/chat/completions")
     except (httpx.RequestError, json.JSONDecodeError) as e:
