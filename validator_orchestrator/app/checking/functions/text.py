@@ -290,7 +290,8 @@ async def calculate_distance_for_token(
         "top_k": -1,
         "max_tokens": 1,
         "logprobs": DEFAULT_NUM_LOGPROBS,
-        "add_special_tokens": False
+        "add_special_tokens": False,
+        "return_tokens_as_token_ids": False
     }
     
     try:
