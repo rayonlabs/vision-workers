@@ -47,7 +47,8 @@ checking_server_configs: list[CheckingServerConfig] = [
 
 CHUTES_BASE_URL = "https://llm.chutes.ai"
 chutes_checking_supported_models = [
-    "OpenGVLab/InternVL3-2B",
+    # "OpenGVLab/InternVL3-2B",
+    "Qwen/Qwen2.5-7B-Instruct",
     "cognitivecomputations/Qwen3-235B-A22B-AWQ"
 ]
 def get_checking_server_config(server_type: ServerType) -> CheckingServerConfig | None:
