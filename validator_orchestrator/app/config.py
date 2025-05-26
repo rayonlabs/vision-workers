@@ -48,8 +48,9 @@ checking_server_configs: list[CheckingServerConfig] = [
 CHUTES_BASE_URL = "https://llm.chutes.ai"
 chutes_checking_supported_models = [
     # "OpenGVLab/InternVL3-2B",
-    "Qwen/Qwen2.5-7B-Instruct",
-    "cognitivecomputations/Qwen3-235B-A22B-AWQ"
+    "casperhansen/deepseek-r1-distill-qwen-32b-awq",
+    "Qwen/Qwen2.5-7B-Instruct", #TODO: redeploy with /tokenize
+    "cognitivecomputations/Qwen3-235B-A22B-AWQ" #TODO: redeploy with /tokenize
 ]
 def get_checking_server_config(server_type: ServerType) -> CheckingServerConfig | None:
     for worker_config in checking_server_configs:
