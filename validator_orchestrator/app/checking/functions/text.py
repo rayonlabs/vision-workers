@@ -72,9 +72,14 @@ def _extract_chat_message(idx: int, response: dict) -> Union[models.MessageRespo
 
 async def _tokenize(prompt: str, model: str, add_special_tokens: bool) -> list[int]:
     async with httpx.AsyncClient() as client:
+        headers = {}
+        if model in chutes_checking_supported_models:
+            auth_token = os.getenv("CHUTES_API_KEY", None)
+            headers["Authorization"] = f"Bearer {auth_token}"
         r = await client.post(
             url=f"{CHUTES_BASE_URL if model in chutes_checking_supported_models else BASE_URL}/tokenize", 
-            json={"model": model, "prompt": prompt, "add_special_tokens": add_special_tokens}
+            json={"model": model, "prompt": prompt, "add_special_tokens": add_special_tokens},
+            headers=headers
         )
         r.raise_for_status()
         return r.json()["tokens"]
@@ -82,9 +87,14 @@ async def _tokenize(prompt: str, model: str, add_special_tokens: bool) -> list[i
 
 async def _detokenize(tokens: list[int], model: str) -> str:
     async with httpx.AsyncClient() as client:
+        headers = {}
+        if model in chutes_checking_supported_models:
+            auth_token = os.getenv("CHUTES_API_KEY", None)
+            headers["Authorization"] = f"Bearer {auth_token}"
         r = await client.post(
             url=f"{CHUTES_BASE_URL if model in chutes_checking_supported_models else BASE_URL}/detokenize", 
-            json={"tokens": tokens, "model": model}
+            json={"tokens": tokens, "model": model},
+            headers=headers
         )
         r.raise_for_status()
         return r.json()["prompt"]
@@ -93,7 +103,16 @@ async def _detokenize(tokens: list[int], model: str) -> str:
 async def _tokenize_and_detokenize(input_payload: dict, model_name: str, eos_token_id: int, add_generation_prompt: bool = True) -> tuple[str, int]:
     async with httpx.AsyncClient() as http_client:
         logger.info(f"Tokenizing at: {CHUTES_BASE_URL if model_name in chutes_checking_supported_models else BASE_URL}/tokenize")
-        tokenize_response = await http_client.post(url=f"{CHUTES_BASE_URL if model_name in chutes_checking_supported_models else BASE_URL}/tokenize", json=input_payload)
+
+        headers={}
+        if model_name in chutes_checking_supported_models:
+            auth_token = os.getenv("CHUTES_API_KEY", None)
+            headers["Authorization"] = f"Bearer {auth_token}"
+        tokenize_response = await http_client.post(
+            url=f"{CHUTES_BASE_URL if model_name in chutes_checking_supported_models else BASE_URL}/tokenize",
+            json=input_payload,
+            headers=headers
+        )
         tokenize_response.raise_for_status()
         token_list: list[int] = tokenize_response.json()["tokens"]
 
@@ -104,7 +123,8 @@ async def _tokenize_and_detokenize(input_payload: dict, model_name: str, eos_tok
 
         detokenize_response = await http_client.post(
             url=f"{CHUTES_BASE_URL if model_name in chutes_checking_supported_models else BASE_URL}/detokenize", 
-            json={"tokens": token_list, "model": model_name}
+            json={"tokens": token_list, "model": model_name},
+            headers=headers
         )
         detokenize_response.raise_for_status()
         prompt = detokenize_response.json()["prompt"]
