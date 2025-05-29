@@ -7,6 +7,11 @@ from functools import wraps
 from model_manager import model_manager
 from starlette.responses import PlainTextResponse
 from loguru import logger
+from image_server.utils import safety_checker as sc
+
+
+safety_checker = sc.Safety_Checker()
+
 
 app = FastAPI()
 
@@ -94,6 +99,15 @@ async def clip_embeddings_text(
 ) -> base_model.ClipEmbeddingsTextResponse:
     embedding = await inference.get_clip_embeddings_text(request_data)
     return base_model.ClipEmbeddingsTextResponse(text_embedding=embedding)
+
+
+@app.post("/check-nsfw")
+@handle_request_errors
+async def check_nsfw(
+    request_data: base_model.CheckNSFWBase,
+) -> base_model.CheckNSFWResponse:
+    is_nsfw = safety_checker.nsfw_check(request_data.image)
+    return base_model.CheckNSFWResponse(is_nsfw=is_nsfw)
 
 
 if __name__ == "__main__":

@@ -165,3 +165,11 @@ class ClipEmbeddingsTextBase(BaseModel):
 
 class ClipEmbeddingsTextResponse(BaseModel):
     text_embedding: Optional[List[float]] = None
+
+
+class CheckNSFWBase(BaseModel):
+    image: str
+
+
+class CheckNSFWResponse(BaseModel):
+    is_nsfw: bool
