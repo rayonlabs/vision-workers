@@ -7,7 +7,7 @@ from functools import wraps
 from model_manager import model_manager
 from starlette.responses import PlainTextResponse
 from loguru import logger
-from image_server.utils import safety_checker as sc
+from utils import safety_checker as sc
 
 
 safety_checker = sc.Safety_Checker()
