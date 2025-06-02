@@ -88,11 +88,20 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
 
     expected_image_response, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload, task_config.server_needed.value)
 
+    is_nsfw_payload = {
+        "image": image_response_body.image_b64
+    }
+    try:
+        is_miner_image_nsfw, _ = await query_endpoint_with_status('/check-nsfw', is_nsfw_payload, task_config.server_needed.value)
+        is_miner_image_nsfw = is_miner_image_nsfw['is_nsfw']
+    except Exception as e:
+        logger.error(f"Failed to query NSFW endpoint: {e}")
+
     if expected_image_response.clip_embeddings is None:
         logger.error(f"For some reason Everything is none! {expected_image_response}")
         return None
 
-    if expected_image_response.is_nsfw != image_response_body.is_nsfw:
+    if is_miner_image_nsfw and is_miner_image_nsfw != image_response_body.is_nsfw:
         return -2
 
     else:

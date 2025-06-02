@@ -34,7 +34,7 @@ async def take_image_and_return_formatted_response_body(
 
     if is_nsfw:
         return base_model.ImageResponseBody(
-            image_b64=None,
+            image_b64=image_b64,
             image_hashes=image_hashes,
             clip_embeddings=clip_embeddings_of_image,
             is_nsfw=is_nsfw,
