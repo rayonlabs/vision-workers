@@ -7,6 +7,7 @@ from diffusers import StableDiffusionPipeline
 from typing import Tuple
 import constants as cst
 import os
+import threading
 
 
 def cosine_distance(image_embeds, text_embeds):
@@ -58,15 +59,37 @@ def forward_inspect(self, clip_input, images):
 
 
 class Safety_Checker:
+    _instance = None
+    _lock = threading.Lock()
+    _initialized = False
+
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super(Safety_Checker, cls).__new__(cls)
+        return cls._instance
+
     def __init__(self):
-        _device = os.getenv("DEVICE", cst.DEFAULT_DEVICE)
-        self.device = _device if "cuda" in _device else f"cuda:{_device}"
-        path = cst.SAFETY_CHECKER_REPO_PATH
-        safety_pipe = StableDiffusionPipeline.from_pretrained(path, torch_dtype=torch.bfloat16).to(self.device)
-        safety_pipe.safety_checker.forward = partial(forward_inspect, self=safety_pipe.safety_checker)
-        self.safety_feature_extractor = safety_pipe.feature_extractor
-        self.safety_checker = safety_pipe.safety_checker
-        self.black_image = Image.open(cst.NSFW_IMAGE_PATH)
+        if Safety_Checker._initialized:
+            return
+            
+        with Safety_Checker._lock:
+            if Safety_Checker._initialized:
+                return
+                
+            print("Loading Safety Checker model (this will only happen once)...")
+            _device = os.getenv("DEVICE", cst.DEFAULT_DEVICE)
+            self.device = _device if "cuda" in _device else f"cuda:{_device}"
+            path = cst.SAFETY_CHECKER_REPO_PATH
+            safety_pipe = StableDiffusionPipeline.from_pretrained(path, torch_dtype=torch.bfloat16).to(self.device)
+            safety_pipe.safety_checker.forward = partial(forward_inspect, self=safety_pipe.safety_checker)
+            self.safety_feature_extractor = safety_pipe.feature_extractor
+            self.safety_checker = safety_pipe.safety_checker
+            self.black_image = Image.open(cst.NSFW_IMAGE_PATH)
+            
+            Safety_Checker._initialized = True
+            print("Safety Checker model loaded successfully!")
 
     def nsfw_check(self, image: Image.Image) -> Tuple[Image.Image, bool]:
         image_np = np.array(image)
