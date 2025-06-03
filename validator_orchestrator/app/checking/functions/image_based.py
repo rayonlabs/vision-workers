@@ -93,7 +93,7 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
     }
     try:
         is_miner_image_nsfw, _ = await query_endpoint_with_status('/check-nsfw', is_nsfw_payload, task_config.server_needed.value)
-        is_miner_image_nsfw = is_miner_image_nsfw['is_nsfw']
+        is_miner_image_nsfw = is_miner_image_nsfw.is_nsfw
     except Exception as e:
         logger.error(f"Failed to query NSFW endpoint: {e}")
 
