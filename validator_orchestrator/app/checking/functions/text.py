@@ -533,10 +533,10 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
 
     try:
         result = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
-    except (httpx.RequestError, json.JSONDecodeError) as e:
+    except Exception as e:
         logger.exception(e)
         logger.error(f"API call failed: {e}")
-        return None
+        raise e
 
     prompt_logprobs = result["choices"][0]["prompt_logprobs"][num_input_tokens:]
     
@@ -634,10 +634,10 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
 
     try:
         result = await make_api_call(chat_completions_payload, endpoint=f"{BASE_URL}/v1/chat/completions")
-    except (httpx.RequestError, json.JSONDecodeError) as e:
+    except Exception as e:
         logger.exception(e)
         logger.error(f"API call failed: {e}")
-        return None
+        raise e
     
     n_generated_tokens = len(messages)
     
