@@ -536,7 +536,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     except (httpx.RequestError, json.JSONDecodeError) as e:
         logger.exception(e)
         logger.error(f"API call failed: {e}")
-        return 0.9876
+        return None
 
     prompt_logprobs = result["choices"][0]["prompt_logprobs"][num_input_tokens:]
     
@@ -637,7 +637,7 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
     except (httpx.RequestError, json.JSONDecodeError) as e:
         logger.exception(e)
         logger.error(f"API call failed: {e}")
-        return 0.9876
+        return None
     
     n_generated_tokens = len(messages)
     
