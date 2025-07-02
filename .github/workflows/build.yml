@@ -18,16 +18,16 @@ jobs:
           chmod +x ./runner-fetch-config.sh
           ./runner-fetch-config.sh
 
-      - name: Decode SSH keys
+      - name: Setup SSH keys
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
         run: |
-          mkdir /home/runner/.ssh || true
-          echo "$SSH_PRIVATE_KEY" | base64 --decode > /home/runner/.ssh/google_compute_engine
-          echo "$SSH_PUBLIC_KEY" | base64 --decode > /home/runner/.ssh/google_compute_engine.pub
-          chmod 600 ~/.ssh/google_compute_engine
-          chmod 644 ~/.ssh/google_compute_engine.pub
+          mkdir -p /home/runner/.ssh
+          echo "$SSH_PRIVATE_KEY" > /home/runner/.ssh/google_compute_engine
+          echo "$SSH_PUBLIC_KEY" > /home/runner/.ssh/google_compute_engine.pub
+          chmod 600 /home/runner/.ssh/google_compute_engine
+          chmod 644 /home/runner/.ssh/google_compute_engine.pub
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v0.3.0
