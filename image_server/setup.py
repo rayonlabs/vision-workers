@@ -2,8 +2,9 @@
 
 import os
 import subprocess
+import shutil
 from typing import Optional
-import huggingface_hub
+from huggingface_hub import hf_hub_download
 from loguru import logger
 
 
@@ -18,12 +19,28 @@ def clone_repo(repo_url: str, target_dir: str, commit_hash: Optional[str] = None
 def download_file(*, repo_id: str, filename: str, local_dir: str, cache_dir: str) -> None:
     os.makedirs(local_dir, exist_ok=True)
     os.makedirs(cache_dir, exist_ok=True)
-    huggingface_hub.hf_hub_download(
+
+    downloaded_path = hf_hub_download(
         repo_id=repo_id,
         filename=filename,
         local_dir=local_dir,
         cache_dir=cache_dir,
     )
+
+    if os.path.sep in filename:
+        flat_target_path = os.path.join(local_dir, os.path.basename(filename))
+        shutil.move(downloaded_path, flat_target_path)
+        subdir = os.path.join(local_dir, os.path.dirname(filename))
+        try:
+            while subdir != local_dir:
+                os.rmdir(subdir)
+                subdir = os.path.dirname(subdir)
+        except OSError:
+            pass 
+
+        print(f"Moved to: {flat_target_path}")
+    else:
+        print(f"Downloaded to: {downloaded_path}")
 
 
 def main():
@@ -31,7 +48,7 @@ def main():
     clone_repo(
         repo_url="https://github.com/comfyanonymous/ComfyUI.git",
         target_dir="ComfyUI",
-        commit_hash="f7a5107784cded39f92a4bb7553507575e78edbe",
+        commit_hash="d9277301d28e732e82d0de1d5948aa00acbf6b65",
     )
 
     logger.info("Cloned ComfyUI, now downloading all models... (this might take a while)")
@@ -72,7 +89,7 @@ def main():
     download_file(
         repo_id="comfyanonymous/flux_text_encoders",
         filename="t5xxl_fp8_e4m3fn.safetensors",
-        local_dir="ComfyUI/models/clip",
+        local_dir="ComfyUI/models/text_encoders",
         cache_dir="ComfyUI/models/caches",
     )
 
@@ -80,7 +97,15 @@ def main():
     download_file(
         repo_id="comfyanonymous/flux_text_encoders",
         filename="clip_l.safetensors",
-        local_dir="ComfyUI/models/clip",
+        local_dir="ComfyUI/models/text_encoders",
+        cache_dir="ComfyUI/models/caches",
+    )
+
+    logger.info("Downloading Hyper-FLUX.1-dev-8steps-lora.safetensors")
+    download_file(
+        repo_id="ByteDance/Hyper-SD",
+        filename="Hyper-FLUX.1-dev-8steps-lora.safetensors",
+        local_dir="ComfyUI/models/loras",
         cache_dir="ComfyUI/models/caches",
     )
 
@@ -97,6 +122,14 @@ def main():
         repo_id="tripathiarpan20/FLUX.1-schnell",
         filename="flux1-schnell.safetensors",
         local_dir="ComfyUI/models/unet",
+        cache_dir="ComfyUI/models/caches",
+    )
+
+    logger.info("flux1-dev-kontext_fp8_scaled.safetensors")
+    download_file(
+        repo_id="Comfy-Org/flux1-kontext-dev_ComfyUI",
+        filename="split_files/diffusion_models/flux1-dev-kontext_fp8_scaled.safetensors",
+        local_dir="ComfyUI/models/diffusion_models",
         cache_dir="ComfyUI/models/caches",
     )
 

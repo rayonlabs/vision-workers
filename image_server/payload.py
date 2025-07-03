@@ -143,7 +143,12 @@ class PayloadModifier:
             seed = random.randint(1, 2**16)
         if "flux" in input_data.model:
             payload["Seed"]["inputs"]["noise_seed"] = seed
+            logger.info(f"Seed: {seed}")
+            logger.info(payload["Seed"]["inputs"]["noise_seed"])
             payload["Guidance"]["inputs"]["guidance"] = input_data.cfg_scale
+            if "kontext" in input_data.model:
+                payload["Latent"]["inputs"]["width"] = input_data.width
+                payload["Latent"]["inputs"]["height"] = input_data.height
         else:
             payload["Negative_prompt"]["inputs"]["text"] += negative_prompt
             payload["Sampler"]["inputs"]["cfg"] = input_data.cfg_scale
