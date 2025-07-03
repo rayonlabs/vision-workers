@@ -55,7 +55,7 @@ async def image_to_image(request_data: base_model.ImageToImageBase) -> base_mode
     return await inference.image_to_image_infer(request_data)
 
 @app.post("/kontext")
-async def image_to_image(request_data: base_model.KontextBase) -> base_model.ImageResponseBody:
+async def kontext_image(request_data: base_model.KontextBase) -> base_model.ImageResponseBody:
     return await inference.kontext_infer(request_data)
 
 
