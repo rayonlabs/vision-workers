@@ -8,6 +8,7 @@ from base_model import (
     ImageToImageBase,
     AvatarBase,
     OutpaintingBase,
+    KontextBase,
     LoadModelRequest
 )
 from typing import Dict, Any, Tuple, List
@@ -156,6 +157,27 @@ class PayloadModifier:
 
         logger.debug(f"payload: {payload}")
         return payload
+
+
+    def modify_kontext(self, input_data: KontextBase) -> Dict[str, Any]:
+        payload = copy.deepcopy(self._payloads[f"{ModelEnum.FLUX_KONTEXT.value}"])
+        init_img = base64_to_image(input_data.init_image)
+        init_img.save(f"{cst.COMFY_INPUT_PATH}init.png")
+
+        payload["Prompt"]["inputs"]["text"] = input_data.prompt
+        payload["Sampler"]["inputs"]["steps"] = input_data.steps
+        payload["Sampler"]["inputs"]["denoise"] = 1
+        seed = input_data.seed
+        if seed == 0:
+            seed = random.randint(1, 2**16)
+        payload["Seed"]["inputs"]["noise_seed"] = seed
+        payload["Guidance"]["inputs"]["guidance"] = input_data.cfg_scale
+        payload["Latent"]["inputs"]["width"] = input_data.width
+        payload["Latent"]["inputs"]["height"] = input_data.height
+
+        logger.debug(f"payload: {payload}")
+        return payload
+
 
     def modify_upscale(self, input_data: UpscaleBase) -> Dict[str, Any]:
         workflow_name = "upscale_sampled" if input_data.sampled else "upscale"
