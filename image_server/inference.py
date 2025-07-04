@@ -32,6 +32,15 @@ async def image_to_image_infer(
     return await misc.take_image_and_return_formatted_response_body(image)
 
 
+async def kontext_infer(
+    infer_props: base_model.KontextBase,
+) -> base_model.ImageResponseBody:
+    logger.info(f"Kontext Inference")
+    payload = payload_modifier.modify_kontext(infer_props)
+    image = api_gate.generate(payload)[0]
+    return await misc.take_image_and_return_formatted_response_body(image)
+
+
 async def upscale_infer(
     infer_props: base_model.UpscaleBase,
 ) -> base_model.ImageResponseBody:
