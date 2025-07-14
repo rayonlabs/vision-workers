@@ -101,14 +101,6 @@ def main():
         cache_dir="ComfyUI/models/caches",
     )
 
-    logger.info("Downloading Hyper-FLUX.1-dev-8steps-lora.safetensors")
-    download_file(
-        repo_id="ByteDance/Hyper-SD",
-        filename="Hyper-FLUX.1-dev-8steps-lora.safetensors",
-        local_dir="ComfyUI/models/loras",
-        cache_dir="ComfyUI/models/caches",
-    )
-
     logger.info("Downloading ae.safetensors")
     download_file(
         repo_id="tripathiarpan20/FLUX.1-schnell",
@@ -125,10 +117,10 @@ def main():
         cache_dir="ComfyUI/models/caches",
     )
 
-    logger.info("flux1-dev-kontext_fp8_scaled.safetensors")
+    logger.info("flux1-kontext-dev.safetensors")
     download_file(
-        repo_id="Comfy-Org/flux1-kontext-dev_ComfyUI",
-        filename="split_files/diffusion_models/flux1-dev-kontext_fp8_scaled.safetensors",
+        repo_id="diagonalge/kontext",
+        filename="flux1-kontext-dev.safetensors",
         local_dir="ComfyUI/models/diffusion_models",
         cache_dir="ComfyUI/models/caches",
     )

@@ -3,8 +3,8 @@
     "inputs": {
       "text": "",
       "clip": [
-        "59",
-        1
+        "11",
+        0
       ]
     },
     "class_type": "CLIPTextEncode",
@@ -51,7 +51,7 @@
   },
   "12": {
     "inputs": {
-      "unet_name": "flux1-dev-kontext_fp8_scaled.safetensors",
+      "unet_name": "flux1-kontext-dev.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -99,7 +99,7 @@
   "Sampler": {
     "inputs": {
       "scheduler": "simple",
-      "steps": 8,
+      "steps": 20,
       "denoise": 1,
       "model": [
         "30",
@@ -129,7 +129,7 @@
   },
   "Seed": {
     "inputs": {
-      "noise_seed": 1117598229971603
+      "noise_seed": 386112450490314
     },
     "class_type": "RandomNoise",
     "_meta": {
@@ -167,7 +167,7 @@
       "width": 1024,
       "height": 1024,
       "model": [
-        "59",
+        "12",
         0
       ]
     },
@@ -195,7 +195,7 @@
   "40": {
     "inputs": {
       "image": [
-        "62",
+        "64",
         0
       ]
     },
@@ -220,25 +220,6 @@
       "title": "ReferenceLatent"
     }
   },
-  "59": {
-    "inputs": {
-      "lora_name": "Hyper-FLUX.1-dev-8steps-lora.safetensors",
-      "strength_model": 0.13000000000000003,
-      "strength_clip": 1,
-      "model": [
-        "12",
-        0
-      ],
-      "clip": [
-        "11",
-        0
-      ]
-    },
-    "class_type": "LoraLoader",
-    "_meta": {
-      "title": "Load LoRA"
-    }
-  },
   "61": {
     "inputs": {
       "images": [
@@ -251,14 +232,13 @@
       "title": "Preview Image"
     }
   },
-  "62": {
-      "inputs": {
-        "image": "init.png",
-        "upload": "image"
-      },
-      "class_type": "LoadImage",
-      "_meta": {
-        "title": "Load Image"
-      }
+  "64": {
+    "inputs": {
+      "image": "init.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
     }
+  }
 }
