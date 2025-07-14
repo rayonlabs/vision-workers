@@ -82,8 +82,6 @@ class ImageToImageBase(BaseModel):
     steps: int = Field(..., description="Number of inference steps, higher for more quality but increased generation time", gt=4, lt=50)
     cfg_scale: float = Field(..., description="Guidance scale", gt=1, lt=12)
     seed: int = Field(..., description="Seed value for deterministic outputs", ge=0)
-    height: int = Field(default=1024, description="Height of the output image in pixels (optional, between 512 and 2048)", ge=512, lt=2048)
-    width: int = Field(default=1024, description="Width of the output image in pixels (optional, between 512 and 2048)", ge=512, lt=2048)
 
 
 class KontextBase(BaseModel):
