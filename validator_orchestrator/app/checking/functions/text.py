@@ -523,15 +523,15 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         logger.error("Number of messages is greater than max_tokens, skipping logprob check, returning 0")
         return 0.0
 
+    full_response_content = "".join([message.content for message in messages])
+    full_prompt, all_tokens, num_input_tokens = await _get_full_prompt(
+        is_completions_payload, 
+        payload, 
+        messages, 
+        task_config, 
+        full_response_content
+    )
     if is_completions_payload:
-        full_response_content = "".join([message.content for message in messages])
-        full_prompt, all_tokens, num_input_tokens = await _get_full_prompt(
-            is_completions_payload, 
-            payload, 
-            messages, 
-            task_config, 
-            full_response_content
-        )
         completions_payload = {
             "prompt": full_prompt,
             "model": task_config.load_model_config["model"],
