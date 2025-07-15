@@ -523,40 +523,79 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
         logger.error("Number of messages is greater than max_tokens, skipping logprob check, returning 0")
         return 0.0
 
-    full_response_content = "".join([message.content for message in messages])
-    
-    full_prompt, all_tokens, num_input_tokens = await _get_full_prompt(
-        is_completions_payload, 
-        payload, 
-        messages, 
-        task_config, 
-        full_response_content
-    )
+    if is_completions_payload:
+        full_response_content = "".join([message.content for message in messages])
+        full_prompt, all_tokens, num_input_tokens = await _get_full_prompt(
+            is_completions_payload, 
+            payload, 
+            messages, 
+            task_config, 
+            full_response_content
+        )
+        completions_payload = {
+            "prompt": full_prompt,
+            "model": task_config.load_model_config["model"],
+            "temperature": payload["temperature"],
+            "max_tokens": 1,
+            "logprobs": True,
+            "prompt_logprobs": DEFAULT_PROMPT_LOGPROBS,
+            "add_special_tokens": False,
+            "top_k": -1,
+            "top_p": 1,
+            "stream": False
+        }
+        logger.info(f"completions_payload for checks: \n{json.dumps(completions_payload, indent=2)}\n")
+        try:
+            result = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
+        except Exception as e:
+            logger.exception(e)
+            logger.error(f"API call failed: {e}")
+            raise e
+        prompt_logprobs = result["choices"][0]["prompt_logprobs"][num_input_tokens:]
+    else:
+        messages = await _extract_messages(formatted_response, is_completions_payload=False)
+        if not messages:
+            logger.error("No valid messages in response.")
+            return 0.0
+        if len(messages) > payload["max_tokens"]:
+            logger.error("Number of messages is greater than max_tokens, skipping logprob check, returning 0")
+            return 0.0
+        full_response_content = "".join([message.content for message in messages])
+        eos_token_id = task_config.load_model_config.get("eos_token_id", 128009)
+        input_chat_content = payload[MESSAGES_KEY]
+        must_output_eos = False
+        eos_token = await _detokenize([eos_token_id], task_config.load_model_config["model"])
+        if len(messages) != payload["max_tokens"] and full_response_content[-len(eos_token):] != eos_token:
+            full_response_content += eos_token
+            must_output_eos = True
+        out_tokens = await _tokenize(full_response_content, task_config.load_model_config["model"], add_special_tokens=False)
+        input_chat_content_w_response = input_chat_content.copy()
+        input_chat_content_w_response.append({"role": "assistant", "content": full_response_content})
+        chat_completions_payload = {
+            "messages": input_chat_content_w_response,
+            "model": task_config.load_model_config["model"],
+            "temperature": payload["temperature"],
+            "max_tokens": 1,
+            "add_generation_prompt": False,
+            "continue_final_message": True,
+            "prompt_logprobs": DEFAULT_PROMPT_LOGPROBS,
+            "add_special_tokens": False,
+            "logprobs": True,
+            "top_k": -1,
+            "top_p": 1,
+            "stream": False
+        }
+        logger.info(f"chat_completions_payload for checks: \n{json.dumps(chat_completions_payload, indent=2)}\n")
+        try:
+            result = await make_api_call(chat_completions_payload, endpoint=f"{BASE_URL}/v1/chat/completions")
+        except Exception as e:
+            logger.exception(e)
+            logger.error(f"API call failed: {e}")
+            raise e
+        n_generated_tokens = len(messages)
+        prompt_logprobs = result["prompt_logprobs"][-n_generated_tokens:]
 
-    completions_payload = {
-        "prompt": full_prompt,
-        "model": task_config.load_model_config["model"],
-        "temperature": payload["temperature"],
-        "max_tokens": 1,
-        "logprobs": True,
-        "prompt_logprobs": DEFAULT_PROMPT_LOGPROBS,
-        "add_special_tokens": False,
-        "top_k": -1,
-        "top_p": 1,
-        "stream": False
-    }
 
-    logger.info(f"completions_payload for checks: \n{json.dumps(completions_payload, indent=2)}\n")
-
-    try:
-        result = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
-    except Exception as e:
-        logger.exception(e)
-        logger.error(f"API call failed: {e}")
-        raise e
-
-    prompt_logprobs = result["choices"][0]["prompt_logprobs"][num_input_tokens:]
-    
     bad_token_found, fail_reason, failed_tokens_idx = await _validate_tokens(
         all_tokens[num_input_tokens:],
         messages, 
