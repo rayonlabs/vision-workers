@@ -17,30 +17,42 @@ def clone_repo(repo_url: str, target_dir: str, commit_hash: Optional[str] = None
 
 
 def download_file(*, repo_id: str, filename: str, local_dir: str, cache_dir: str) -> None:
-    os.makedirs(local_dir, exist_ok=True)
     os.makedirs(cache_dir, exist_ok=True)
+
+    is_file_path = os.path.splitext(local_dir)[1] != ""
+    if is_file_path:
+        os.makedirs(os.path.dirname(local_dir), exist_ok=True)
+    else:
+        os.makedirs(local_dir, exist_ok=True)
 
     downloaded_path = hf_hub_download(
         repo_id=repo_id,
         filename=filename,
-        local_dir=local_dir,
         cache_dir=cache_dir,
     )
+    real_downloaded_path = os.path.realpath(downloaded_path)
 
-    if os.path.sep in filename:
-        flat_target_path = os.path.join(local_dir, os.path.basename(filename))
-        shutil.move(downloaded_path, flat_target_path)
+    if is_file_path:
+        target_path = local_dir
+    else:
+        target_path = os.path.join(local_dir, os.path.basename(filename))
+
+    shutil.copyfile(real_downloaded_path, target_path)
+    print(f"Downloaded and copied to: {target_path}")
+
+    if not is_file_path and os.path.sep in filename:
         subdir = os.path.join(local_dir, os.path.dirname(filename))
         try:
             while subdir != local_dir:
                 os.rmdir(subdir)
                 subdir = os.path.dirname(subdir)
         except OSError:
-            pass 
-
-        print(f"Moved to: {flat_target_path}")
-    else:
-        print(f"Downloaded to: {downloaded_path}")
+            pass
+    try:
+        os.remove(real_downloaded_path)
+        print(f"Removed from cache: {real_downloaded_path}")
+    except OSError as e:
+        print(f"Warning: Failed to remove cache file: {e}")
 
 
 def main():
@@ -65,7 +77,7 @@ def main():
     download_file(
         repo_id="Lykon/dreamshaper-xl-v2-turbo",
         filename="DreamShaperXL_Turbo_v2_1.safetensors",
-        local_dir="ComfyUI/models/checkpoints",
+        local_dir="ComfyUI/models/checkpoints/dreamshaperturbo.safetensors",
         cache_dir="ComfyUI/models/caches",
     )
 
@@ -73,7 +85,7 @@ def main():
     download_file(
         repo_id="dataautogpt3/ProteusV0.4-Lightning",
         filename="ProteusV0.4-Lighting.safetensors",
-        local_dir="ComfyUI/models/checkpoints",
+        local_dir="ComfyUI/models/checkpoints/proteus.safetensors",
         cache_dir="ComfyUI/models/caches",
     )
 
@@ -81,7 +93,7 @@ def main():
     download_file(
         repo_id="playgroundai/playground-v2.5-1024px-aesthetic",
         filename="playground-v2.5-1024px-aesthetic.fp16.safetensors",
-        local_dir="ComfyUI/models/checkpoints",
+        local_dir="ComfyUI/models/checkpoints/playground.safetensors",
         cache_dir="ComfyUI/models/caches",
     )
 
@@ -144,7 +156,7 @@ def main():
     logger.info("Downloading sdxl.vae.safetensors")
     download_file(
         repo_id="madebyollin/sdxl-vae-fp16-fix",
-        filename="sdxl.vae.safetensors",
+        filename="sdxl_vae.safetensors",
         local_dir="ComfyUI/models/vae",
         cache_dir="ComfyUI/models/caches",
     )
@@ -181,7 +193,7 @@ def main():
     download_file(
         repo_id="tau-vision/insightface-antelopev2",
         filename="antelopev2.zip",
-        local_dir="ComfyUI/models/insightface/models",
+        local_dir="ComfyUI/models/insightface/models/antelopev2.zip",
         cache_dir="ComfyUI/models/caches",
     )
     if not os.path.exists("ComfyUI/models/insightface/models/antelopev2"):
