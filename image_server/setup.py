@@ -93,6 +93,14 @@ def main():
         cache_dir="ComfyUI/models/caches",
     )
 
+    logger.info("Downloading t5xxl_fp8_e4m3fn.safetensors")
+    download_file(
+        repo_id="comfyanonymous/flux_text_encoders",
+        filename="t5xxl_fp8_e4m3fn.safetensors",
+        local_dir="ComfyUI/models/text_encoders",
+        cache_dir="ComfyUI/models/caches",
+    )
+
     logger.info("Downloading clip_l.safetensors")
     download_file(
         repo_id="comfyanonymous/flux_text_encoders",
