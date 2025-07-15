@@ -78,7 +78,7 @@ class ImageToImageBase(BaseModel):
     negative_prompt: str = Field(default="", description="The negative prompt to generate the image")
     init_image: str
     model: str = Field(..., description="The engine to use for image generation")
-    image_strength: float = Field(..., description="Image strength of the generated image with respect to the original image", ge=0, le=1)
+    image_strength: float = Field(..., description="Image strength of the generated image with respect to the original image", gt=0.01, lt=1)
     steps: int = Field(..., description="Number of inference steps, higher for more quality but increased generation time", gt=4, lt=50)
     cfg_scale: float = Field(..., description="Guidance scale", gt=1, lt=12)
     seed: int = Field(..., description="Seed value for deterministic outputs", ge=0)
