@@ -259,37 +259,54 @@ async def calculate_distance_for_token(
     
     if isinstance(llm_request, models.ChatRequestModel):
         messages = [elm.model_dump() for elm in llm_request.messages]
-        prompt, _ = await _chat_to_prompt(
-            messages=messages,
-            model_name=model_name,
-            eos_token_id=eos_token_id,
-            add_generation_prompt=starting_assistant_message,
-        )
         if 'deepseek-r1' in model_name.lower():
             prompt = await _process_think_tags_deepseek(prompt, messages)
+        chat_completions_payload = {
+            "messages": messages,
+            "model": task_config.load_model_config["model"],
+            "temperature": llm_request.temperature,
+            "top_p": 1,
+            "max_tokens": 1,
+            "logprobs": True,
+            "top_logprobs": 20,
+            "add_generation_prompt": starting_assistant_message,
+            "continue_final_message": not starting_assistant_message,
+            "add_special_tokens": False
+        }
+        try:
+            validator_checking_response = await make_api_call(chat_completions_payload, endpoint=f"{BASE_URL}/v1/chat/completions")
+            validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["content"][0]["top_logprobs"]
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding JSON in calculate_distance_for_token_vlm: {e}. Response: {validator_checking_response}")
+            return 1
+        except httpx.RequestError as e:
+            logger.error(f"Request failed in calculate_distance_for_token_vlm: {e}")
+            return 1
+
+        
             
     elif isinstance(llm_request, models.CompletionRequestModel):
         prompt = llm_request.prompt
-
-    completions_payload = {
-        "prompt": prompt,
-        "model": model_name,
-        "temperature": llm_request.temperature,
-        "top_p": llm_request.top_p,
-        "top_k": -1,
-        "max_tokens": 1,
-        "logprobs": DEFAULT_NUM_LOGPROBS,
-        "add_special_tokens": False
-    }
-    
-    try:
-        validator_checking_response = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
-    except json.JSONDecodeError as e:
-        logger.error(f"Error decoding JSON in calculate_distance_for_token: {e}. Response: {validator_checking_response}")
-        return 1
-    except httpx.RequestError as e:
-        logger.error(f"Request failed in calculate_distance_for_token: {e}")
-        return 1
+        completions_payload = {
+            "prompt": prompt,
+            "model": model_name,
+            "temperature": llm_request.temperature,
+            "top_p": llm_request.top_p,
+            "top_k": -1,
+            "max_tokens": 1,
+            "logprobs": DEFAULT_NUM_LOGPROBS,
+            "add_special_tokens": False
+        }
+        
+        try:
+            validator_checking_response = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
+            validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["top_logprobs"][0]
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding JSON in calculate_distance_for_token: {e}. Response: {validator_checking_response}")
+            return 1
+        except httpx.RequestError as e:
+            logger.error(f"Request failed in calculate_distance_for_token: {e}")
+            return 1
 
     logger.info(f"completion payload: \n{json.dumps(completions_payload, indent=2)}\n")
     logger.info(f"validator_checking_response: \n{json.dumps(validator_checking_response, indent=2)}\n")
@@ -300,7 +317,7 @@ async def calculate_distance_for_token(
     #text = chat_responses[index].content
     text = chat_responses[index].logits.text_token
 
-    validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["top_logprobs"][0]
+    
 
     if text not in validator_log_probs_for_token:
         logger.info(f"token: {chat_responses[index].content} (parsed as {text}) - not found in vali logprobs")
