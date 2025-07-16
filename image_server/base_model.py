@@ -9,6 +9,7 @@ class ModelEnum(str, Enum):
     PROTEUS = "proteus"
     PLAYGROUND = "playground"
     FLUX_SCHNELL = "flux"
+    FLUX_KONTEXT = "flux-kontext"
 
 
 class SamplerEnum(str, Enum):
@@ -81,6 +82,17 @@ class ImageToImageBase(BaseModel):
     steps: int = Field(..., description="Number of inference steps, higher for more quality but increased generation time", gt=4, lt=50)
     cfg_scale: float = Field(..., description="Guidance scale", gt=1, lt=12)
     seed: int = Field(..., description="Seed value for deterministic outputs", ge=0)
+
+
+class ImageEditBase(BaseModel):
+    prompt: str = Field(..., description="The prompt to generate the image")
+    init_image: str
+    steps: int = Field(..., description="Number of inference steps, higher for more quality but increased generation time", gt=4, lt=50)
+    cfg_scale: float = Field(..., description="Guidance scale", gt=1, lt=12)
+    seed: int = Field(..., description="Seed value for deterministic outputs", ge=0)
+    height: int = Field(default=1024, description="Height of the output image in pixels (optional, between 512 and 2048)", ge=512, lt=2048)
+    width: int = Field(default=1024, description="Width of the output image in pixels (optional, between 512 and 2048)", ge=512, lt=2048)
+    model: str = Field(default="flux-kontext-image-edit", title="Model")
 
 
 class UpscaleBase(BaseModel):

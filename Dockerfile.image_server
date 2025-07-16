@@ -77,5 +77,7 @@ RUN mkdir /app/cache \
 ENV HF_HOME=/app/cache
 ENV HF_HUB_CACHE=/app/cache/hub
 
+RUN pip install -U aiohttp yarl spandrel av alembic
+
 
 CMD ["sh", "-c", "cd /app/image_server && ./entrypoint.sh"]
