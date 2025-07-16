@@ -8,7 +8,7 @@ from base_model import (
     ImageToImageBase,
     AvatarBase,
     OutpaintingBase,
-    KontextBase,
+    ImageEditBase,
     LoadModelRequest
 )
 from typing import Dict, Any, Tuple, List
@@ -154,8 +154,8 @@ class PayloadModifier:
         return payload
 
 
-    def modify_kontext(self, input_data: KontextBase) -> Dict[str, Any]:
-        payload = copy.deepcopy(self._payloads[f"{ModelEnum.FLUX_KONTEXT.value}"])
+    def modify_edit_image(self, input_data: ImageEditBase) -> Dict[str, Any]:
+        payload = copy.deepcopy(self._payloads[f"{input_data.model}"])
         init_img = base64_to_image(input_data.init_image)
         init_img.save(f"{cst.COMFY_INPUT_PATH}init.png")
 

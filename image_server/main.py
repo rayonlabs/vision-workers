@@ -54,9 +54,9 @@ async def text_to_image(request_data: base_model.TextToImageBase) -> base_model.
 async def image_to_image(request_data: base_model.ImageToImageBase) -> base_model.ImageResponseBody:
     return await inference.image_to_image_infer(request_data)
 
-@app.post("/kontext")
-async def kontext_image(request_data: base_model.KontextBase) -> base_model.ImageResponseBody:
-    return await inference.kontext_infer(request_data)
+@app.post("/image-edit")
+async def edit_image(request_data: base_model.ImageEditBase) -> base_model.ImageResponseBody:
+    return await inference.edit_image_infer(request_data)
 
 
 @app.post("/upscale")

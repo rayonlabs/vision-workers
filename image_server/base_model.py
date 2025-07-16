@@ -84,7 +84,7 @@ class ImageToImageBase(BaseModel):
     seed: int = Field(..., description="Seed value for deterministic outputs", ge=0)
 
 
-class KontextBase(BaseModel):
+class ImageEditBase(BaseModel):
     prompt: str = Field(..., description="The prompt to generate the image")
     init_image: str
     steps: int = Field(..., description="Number of inference steps, higher for more quality but increased generation time", gt=4, lt=50)
@@ -92,6 +92,7 @@ class KontextBase(BaseModel):
     seed: int = Field(..., description="Seed value for deterministic outputs", ge=0)
     height: int = Field(default=1024, description="Height of the output image in pixels (optional, between 512 and 2048)", ge=512, lt=2048)
     width: int = Field(default=1024, description="Width of the output image in pixels (optional, between 512 and 2048)", ge=512, lt=2048)
+    model: str = Field(default="flux-kontext-image-edit", title="Model")
 
 
 class UpscaleBase(BaseModel):

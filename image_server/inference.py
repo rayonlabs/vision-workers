@@ -32,11 +32,11 @@ async def image_to_image_infer(
     return await misc.take_image_and_return_formatted_response_body(image)
 
 
-async def kontext_infer(
-    infer_props: base_model.KontextBase,
+async def edit_image_infer(
+    infer_props: base_model.ImageEditBase,
 ) -> base_model.ImageResponseBody:
-    logger.info(f"Kontext Inference")
-    payload = payload_modifier.modify_kontext(infer_props)
+    logger.info("Image Edit Inference")
+    payload = payload_modifier.modify_edit_image(infer_props)
     image = api_gate.generate(payload)[0]
     return await misc.take_image_and_return_formatted_response_body(image)
 
