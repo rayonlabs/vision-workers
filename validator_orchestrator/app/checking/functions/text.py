@@ -366,7 +366,7 @@ async def _get_full_prompt(is_completions_payload, payload, messages, task_confi
 
 #----
 
-async def _detect_repetitive_patterns(messages: List[models.MessageResponse], min_pattern_length: int = 10, max_repetitions: int = 3) -> tuple[bool, str]:
+async def _detect_repetitive_patterns(messages: List[models.MessageResponse], min_pattern_length: int = 10, max_repetitions: int = 3) -> tuple[bool, str, int]:
     """
     Detect repetitive patterns in the response content.
     
@@ -376,9 +376,11 @@ async def _detect_repetitive_patterns(messages: List[models.MessageResponse], mi
         max_repetitions: Maximum allowed repetitions before flagging
         
     Returns:
-        (is_repetitive, reason)
+        (is_repetitive, reason, max_repetition_count)
     """
     full_content = "".join([msg.content for msg in messages])
+    max_repetition_count = 0
+    most_repeated_pattern = ""
     
     # Check for exact substring repetitions
     for pattern_len in range(min_pattern_length, min(len(full_content) // 2, 100)):
@@ -398,8 +400,9 @@ async def _detect_repetitive_patterns(messages: List[models.MessageResponse], mi
                 count += 1
                 pos += pattern_len
                 
-            if count > max_repetitions:
-                return True, f"Pattern '{pattern[:50]}...' repeated {count} times (max allowed: {max_repetitions})"
+            if count > max_repetition_count:
+                max_repetition_count = count
+                most_repeated_pattern = pattern
     
     # Check for similar sentence-level repetitions
     sentences = full_content.split('.')
@@ -411,10 +414,14 @@ async def _detect_repetitive_patterns(messages: List[models.MessageResponse], mi
                 sentence_counts[cleaned] = sentence_counts.get(cleaned, 0) + 1
                 
         for sentence, count in sentence_counts.items():
-            if count > max_repetitions:
-                return True, f"Sentence repeated {count} times: '{sentence[:100]}...'"
+            if count > max_repetition_count:
+                max_repetition_count = count
+                most_repeated_pattern = sentence
     
-    return False, ""
+    is_repetitive = max_repetition_count > max_repetitions
+    reason = f"Pattern '{most_repeated_pattern[:50]}...' repeated {max_repetition_count} times" if is_repetitive else ""
+    
+    return is_repetitive, reason, max_repetition_count
 
 
 async def _analyze_token_distribution(messages: List[models.MessageResponse], prompt_logprobs: List[Dict[str, Any]]) -> tuple[bool, str]:
@@ -547,20 +554,32 @@ async def _validate_tokens(
         except Exception as e:
             logger.warning(f"Validator comparison failed: {e}")
     
-    # 3. Smart repetition detection (only flag if validator doesn't also repeat)
-    is_repetitive, repetition_reason = await _detect_repetitive_patterns(messages, min_pattern_length=20, max_repetitions=8)
-    if is_repetitive and validator_content:
-        # Check if validator also has similar repetition
-        validator_messages = [models.MessageResponse(content=validator_content, logits=None)]
-        validator_repetitive, _ = await _detect_repetitive_patterns(validator_messages, min_pattern_length=20, max_repetitions=8)
-        
-        if not validator_repetitive:
-            return True, f"Repetitive content not in validator: {repetition_reason}", []
-    elif is_repetitive and not validator_content:
-        # If no validator comparison, be more lenient
-        is_repetitive, repetition_reason = await _detect_repetitive_patterns(messages, min_pattern_length=30, max_repetitions=15)
-        if is_repetitive:
-            return True, f"Extreme repetition detected: {repetition_reason}", []
+    # 3. Smart repetition detection with comparative analysis
+    is_repetitive, repetition_reason, miner_max_repetitions = await _detect_repetitive_patterns(messages, min_pattern_length=20, max_repetitions=8)
+    
+    if is_repetitive:
+        if validator_content:
+            # Compare repetition levels between miner and validator
+            validator_messages = [models.MessageResponse(content=validator_content, logits=None)]
+            validator_repetitive, _, validator_max_repetitions = await _detect_repetitive_patterns(validator_messages, min_pattern_length=20, max_repetitions=8)
+            
+            if not validator_repetitive:
+                # Validator has no significant repetition but miner does - likely cheating
+                return True, f"Miner has repetition but validator doesn't: {repetition_reason}", []
+            else:
+                # Both have repetition, compare the degree
+                repetition_ratio = miner_max_repetitions / max(validator_max_repetitions, 1)
+                
+                # If miner has 30% more repetitions than validator, it's suspicious
+                if repetition_ratio > 1.3:  # 30% more repetitions
+                    return True, f"Miner has {repetition_ratio:.1f}x more repetitions than validator: miner={miner_max_repetitions}, validator={validator_max_repetitions}", []
+                # If miner has way fewer repetitions than validator (like 70% less), also suspicious
+                elif repetition_ratio < 0.7:  # 30% fewer repetitions
+                    return True, f"Miner has suspiciously fewer repetitions than validator: miner={miner_max_repetitions}, validator={validator_max_repetitions}", []
+        else:
+            # No validator comparison available, use stricter thresholds
+            if miner_max_repetitions > 15:  # Much higher threshold without validator
+                return True, f"Extreme repetition without validator comparison: {repetition_reason}", []
     
     # 4. Enhanced token distribution analysis
     is_anomalous, anomaly_reason = await _analyze_token_distribution(messages, prompt_logprobs)
