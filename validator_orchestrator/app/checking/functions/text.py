@@ -376,7 +376,7 @@ async def _validate_tokens(out_tokens: List, messages: List[models.MessageRespon
             rank = logprobs[str(response_token)]["rank"]
 
             if rank < max_acceptable_rank and logprob > float("-inf"):
-                logger.info(f"Token {response_token} {additional_log} in logprobs with good behaviour; rank: {rank}, logprob: {logprob} ✅")
+                pass
             else:
                 logger.error(f"Token {response_token} {additional_log} in logprobs with bad behaviour; rank: {rank}, logprob: {logprob} ❌")
                 failed_tokens_idx.append(idx)
