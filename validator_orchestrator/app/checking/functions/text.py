@@ -25,7 +25,9 @@ DEFAULT_NUM_LOGPROBS = 20
 DEFAULT_PROMPT_LOGPROBS = 1 #vllm 0.8.3 breaks at some arbitrary prompt_logprobs > 1: https://github.com/vllm-project/vllm/issues/16836 
 
 MODELS_FOR_EOT_HANDLING = ["llama-3", "deepseek-r1", "qwq-32b", "qwen2.5-7b", "qwen3", "mistral-nemo"]
-
+MIN_EXPECTED_TOKENS_RATIO = 0.3
+VALIDATOR_COMPARISON_THRESHOLD = 0.8
+EARLY_STOPPING_SUSPICIOUS_RATIO = 0.15
 
 def _score_average_distance(average_distance: float) -> float:
     if average_distance <= BOTTOM_TEXT_THRESHOLD:
@@ -481,64 +483,120 @@ async def _validate_tokens(
     messages: List[models.MessageResponse], 
     prompt_logprobs: List[Dict[str, Any]], 
     payload: Dict, 
-    eos_token_id: int
+    eos_token_id: int,
+    task_config: models.OrchestratorServerConfig = None  # Add this parameter
 ) -> tuple[bool, str, List[int]]:
     """
-    Enhanced token validation with repetition detection and distribution analysis.
+    Enhanced token validation with cheating detection.
     """
     failed_tokens_idx = []
     failed_tokens_details = []
     max_acceptable_rank = 5
     
-    # First, check for repetitive patterns
-    is_repetitive, repetition_reason = await _detect_repetitive_patterns(messages)
-    if is_repetitive:
-        return True, f"Repetitive content detected: {repetition_reason}", []
+    full_content = "".join([msg.content for msg in messages])
     
-    # Analyze token distribution for anomalies
+    # 1. Check for early stopping cheating
+    max_tokens = payload.get("max_tokens", 100)
+    actual_tokens = len(messages)
+    stopping_ratio = actual_tokens / max_tokens
+    
+    if stopping_ratio < MIN_EXPECTED_TOKENS_RATIO:
+        # Check if EOS was actually likely when stopping
+        if len(prompt_logprobs) > 0 and eos_token_id:
+            last_few_logprobs = prompt_logprobs[-min(3, len(prompt_logprobs)):]
+            high_eos_prob_count = 0
+            
+            for logprob_data in last_few_logprobs:
+                if str(eos_token_id) in logprob_data:
+                    eos_prob = math.exp(logprob_data[str(eos_token_id)]["logprob"])
+                    if eos_prob > 0.1:  # 10% probability of stopping
+                        high_eos_prob_count += 1
+            
+            if high_eos_prob_count == 0:
+                return True, f"Suspicious early stopping: generated only {actual_tokens}/{max_tokens} tokens without high EOS probability", []
+    
+    # 2. Generate validator response for comparison (only if suspicious)
+    validator_content = ""
+    if stopping_ratio < 0.5 or task_config:  # Only generate if really suspicious or config available
+        try:
+            validator_payload = payload.copy()
+            if task_config:
+                validator_payload["model"] = task_config.load_model_config["model"]
+                
+                if _payload_is_completions(payload):
+                    endpoint = "completions"
+                else:
+                    endpoint = "chat/completions"
+                    
+                validator_response, status_code = await query_endpoint_with_status(
+                    endpoint, validator_payload
+                )
+                
+                if status_code == 200 and validator_response:
+                    if _payload_is_completions(payload):
+                        validator_content = validator_response["choices"][0]["text"]
+                    else:
+                        validator_content = validator_response["choices"][0]["message"]["content"]
+                    
+                    validator_token_count = len(validator_content.split())
+                    miner_token_count = len(full_content.split())
+                    
+                    # Check for suspicious early stopping vs validator
+                    if miner_token_count < validator_token_count * 0.3:
+                        return True, f"Suspicious early stopping vs validator: miner {miner_token_count} vs validator {validator_token_count} tokens", []
+        except Exception as e:
+            logger.warning(f"Validator comparison failed: {e}")
+    
+    # 3. Smart repetition detection (only flag if validator doesn't also repeat)
+    is_repetitive, repetition_reason = await _detect_repetitive_patterns(messages, min_pattern_length=20, max_repetitions=8)
+    if is_repetitive and validator_content:
+        # Check if validator also has similar repetition
+        validator_messages = [models.MessageResponse(content=validator_content, logits=None)]
+        validator_repetitive, _ = await _detect_repetitive_patterns(validator_messages, min_pattern_length=20, max_repetitions=8)
+        
+        if not validator_repetitive:
+            return True, f"Repetitive content not in validator: {repetition_reason}", []
+    elif is_repetitive and not validator_content:
+        # If no validator comparison, be more lenient
+        is_repetitive, repetition_reason = await _detect_repetitive_patterns(messages, min_pattern_length=30, max_repetitions=15)
+        if is_repetitive:
+            return True, f"Extreme repetition detected: {repetition_reason}", []
+    
+    # 4. Enhanced token distribution analysis
     is_anomalous, anomaly_reason = await _analyze_token_distribution(messages, prompt_logprobs)
     if is_anomalous:
         return True, f"Anomalous token distribution: {anomaly_reason}", []
     
     logger.info(f"prompt_logprobs : {json.dumps(prompt_logprobs[:2], indent=2)}")
     
-    # Original token validation logic with enhanced criteria
+    # 5. Individual token validation (more lenient thresholds)
     suspicious_token_count = 0
     total_rank_penalty = 0
     
     for idx, response_token, logprobs in zip(range(len(out_tokens)), out_tokens, prompt_logprobs):
-        nice_logprobs = json.dumps(logprobs, indent=2, sort_keys=True, ensure_ascii=False)
-        additional_log = f" (decoded: '{messages[idx].content}', logprob: {messages[idx].logits.logprob})" if idx <= len(messages) - 1 else ""
+        additional_log = f" (decoded: '{messages[idx].content}', logprob: {messages[idx].logits.logprob})" if idx < len(messages) else ""
 
         if str(response_token) in logprobs:
             logprob = logprobs[str(response_token)]["logprob"]
             rank = logprobs[str(response_token)]["rank"]
             
-            # Enhanced criteria for token acceptance
+            # More lenient individual token criteria
             is_token_acceptable = True
             failure_reasons = []
             
-            # Original rank and logprob checks
-            if rank >= max_acceptable_rank:
-                is_token_acceptable = False
-                failure_reasons.append(f"rank too high ({rank} >= {max_acceptable_rank})")
-                
-            if logprob <= float("-inf"):
-                is_token_acceptable = False
-                failure_reasons.append("logprob is -inf")
-            
-            # Additional checks for suspicious tokens
-            if rank > 100:  # Very unlikely token
-                suspicious_token_count += 1
-                total_rank_penalty += rank
-                
-            if rank > 1000:  # Extremely unlikely token
+            # Only fail on extreme cases
+            if rank >= 10000:  # Much higher threshold
                 is_token_acceptable = False
                 failure_reasons.append(f"extremely unlikely token (rank {rank})")
                 
-            if logprob < -15:  # Very low probability
+            if logprob < -20:  # Much lower threshold
                 is_token_acceptable = False
-                failure_reasons.append(f"very low probability (logprob {logprob})")
+                failure_reasons.append(f"extremely low probability (logprob {logprob})")
+            
+            # Track suspicious tokens for overall analysis
+            if rank > max_acceptable_rank:
+                suspicious_token_count += 1
+                total_rank_penalty += rank
             
             if not is_token_acceptable:
                 logger.error(f"Token {response_token} {additional_log} failed validation: {', '.join(failure_reasons)} ❌")
@@ -547,13 +605,13 @@ async def _validate_tokens(
 
                 if len(failed_tokens_idx) > MAX_FAILED_TOKENS:
                     failed_tokens_details_str = json.dumps(failed_tokens_details, indent=2, sort_keys=True, ensure_ascii=False)
-                    fail_reason = f"Too many bad tokens found ('response_token', 'rank', 'logprob', 'additional_log', 'reasons'):\n{failed_tokens_details_str}"
+                    fail_reason = f"Too many extremely bad tokens:\n{failed_tokens_details_str}"
                     return True, fail_reason, failed_tokens_idx
         else:
-            logger.error(f"Token {response_token} {additional_log} not found in logprobs :(")
+            logger.error(f"Token {response_token} {additional_log} not found in logprobs")
             return True, "Token not found in logprobs", failed_tokens_idx
 
-        # Enhanced EOS token handling
+        # Enhanced EOS token handling (more lenient)
         if str(eos_token_id) in logprobs and str(response_token) != str(eos_token_id):
             eos_logprob = logprobs[str(eos_token_id)]["logprob"]
             response_logprob = logprobs[str(response_token)]["logprob"]
@@ -565,31 +623,24 @@ async def _validate_tokens(
                 try:
                     if response_logprob > float("-inf"):
                         prob_ratio = math.exp(eos_logprob) / math.exp(response_logprob)
-                        # More strict threshold for stopping avoidance
-                        if prob_ratio > 50:  # Reduced from 100
-                            return True, f"Avoided stopping when EOS was {prob_ratio:.2f}x more likely", failed_tokens_idx
-                    else:
-                        pass
-
+                        if prob_ratio > 1000:  # Much more lenient
+                            return True, f"Extreme stopping avoidance: EOS was {prob_ratio:.2f}x more likely", failed_tokens_idx
                 except (ZeroDivisionError, OverflowError):
                     logger.warning("Math error when comparing token probabilities")
                     return True, "Math error in probability comparison", failed_tokens_idx
     
-    # Check overall suspicious token ratio
-    if len(messages) > 20:  # Only for longer responses
+    # 6. Overall quality checks (more lenient)
+    if len(messages) > 20:
         suspicious_ratio = suspicious_token_count / len(messages)
         avg_rank_penalty = total_rank_penalty / len(messages) if len(messages) > 0 else 0
         
-        if suspicious_ratio > 0.5:  # More than 50% suspicious tokens
-            return True, f"Too many suspicious tokens: {suspicious_token_count}/{len(messages)} ({suspicious_ratio:.2%}) have rank > 100", failed_tokens_idx
+        if suspicious_ratio > 0.8:  # Much higher threshold
+            return True, f"Extremely high suspicious token ratio: {suspicious_token_count}/{len(messages)} ({suspicious_ratio:.2%})", failed_tokens_idx
             
-        if avg_rank_penalty > 200:  # Average rank penalty too high
-            return True, f"Average token rank too high: {avg_rank_penalty:.1f} (indicating poor overall quality)", failed_tokens_idx
+        if avg_rank_penalty > 1000:  # Much higher threshold
+            return True, f"Extremely high average token rank: {avg_rank_penalty:.1f}", failed_tokens_idx
 
     return False, "", failed_tokens_idx
-
-
-
 #----
 
 
