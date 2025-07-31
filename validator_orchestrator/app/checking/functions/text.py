@@ -522,37 +522,36 @@ async def _validate_tokens(
             if high_eos_prob_count == 0:
                 return True, f"Suspicious early stopping: generated only {actual_tokens}/{max_tokens} tokens without high EOS probability", []
     
-    # 2. Generate validator response for comparison (only if suspicious)
     validator_content = ""
-    if stopping_ratio < 0.5 or task_config:  # Only generate if really suspicious or config available
-        try:
-            validator_payload = payload.copy()
-            if task_config:
-                validator_payload["model"] = task_config.load_model_config["model"]
+    try:
+        validator_payload = payload.copy()
+        if task_config:
+            validator_payload["model"] = task_config.load_model_config["model"]
+            
+            if _payload_is_completions(payload):
+                endpoint = "completions"
+            else:
+                endpoint = "chat/completions"
                 
+            validator_response, status_code = await query_endpoint_with_status(
+                endpoint, validator_payload
+            )
+            
+            if status_code == 200 and validator_response:
                 if _payload_is_completions(payload):
-                    endpoint = "completions"
+                    validator_content = validator_response["choices"][0]["text"]
                 else:
-                    endpoint = "chat/completions"
-                    
-                validator_response, status_code = await query_endpoint_with_status(
-                    endpoint, validator_payload
-                )
+                    validator_content = validator_response["choices"][0]["message"]["content"]
                 
-                if status_code == 200 and validator_response:
-                    if _payload_is_completions(payload):
-                        validator_content = validator_response["choices"][0]["text"]
-                    else:
-                        validator_content = validator_response["choices"][0]["message"]["content"]
-                    
-                    validator_token_count = len(validator_content.split())
-                    miner_token_count = len(full_content.split())
-                    
-                    # Check for suspicious early stopping vs validator
-                    if miner_token_count < validator_token_count * 0.3:
-                        return True, f"Suspicious early stopping vs validator: miner {miner_token_count} vs validator {validator_token_count} tokens", []
-        except Exception as e:
-            logger.warning(f"Validator comparison failed: {e}")
+                validator_token_count = len(validator_content.split())
+                miner_token_count = len(full_content.split())
+                
+                # Check for suspicious early stopping vs validator
+                if miner_token_count < validator_token_count * 0.3:
+                    return True, f"Suspicious early stopping vs validator: miner {miner_token_count} vs validator {validator_token_count} tokens", []
+    except Exception as e:
+        logger.exception(e)
+        logger.warning(f"Validator comparison failed: {e}")
     
     # 3. Smart repetition detection with comparative analysis
     is_repetitive, repetition_reason, miner_max_repetitions = await _detect_repetitive_patterns(messages, min_pattern_length=20, max_repetitions=8)
