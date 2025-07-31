@@ -361,12 +361,151 @@ async def _get_full_prompt(is_completions_payload, payload, messages, task_confi
         return full_prompt, all_tokens, num_input_tokens
 
 
-async def _validate_tokens(out_tokens: List, messages: List[models.MessageResponse], prompt_logprobs: List[Dict[str, Any]], payload: Dict, eos_token_id: int):
+
+#----
+
+async def _detect_repetitive_patterns(messages: List[models.MessageResponse], min_pattern_length: int = 10, max_repetitions: int = 3) -> tuple[bool, str]:
+    """
+    Detect repetitive patterns in the response content.
+    
+    Args:
+        messages: List of message responses
+        min_pattern_length: Minimum length of pattern to consider
+        max_repetitions: Maximum allowed repetitions before flagging
+        
+    Returns:
+        (is_repetitive, reason)
+    """
+    full_content = "".join([msg.content for msg in messages])
+    
+    # Check for exact substring repetitions
+    for pattern_len in range(min_pattern_length, min(len(full_content) // 2, 100)):
+        for start_pos in range(len(full_content) - pattern_len):
+            pattern = full_content[start_pos:start_pos + pattern_len]
+            
+            # Skip patterns that are just whitespace or single characters
+            if len(set(pattern.strip())) <= 1:
+                continue
+                
+            count = 0
+            pos = 0
+            while True:
+                pos = full_content.find(pattern, pos)
+                if pos == -1:
+                    break
+                count += 1
+                pos += pattern_len
+                
+            if count > max_repetitions:
+                return True, f"Pattern '{pattern[:50]}...' repeated {count} times (max allowed: {max_repetitions})"
+    
+    # Check for similar sentence-level repetitions
+    sentences = full_content.split('.')
+    if len(sentences) > 5:
+        sentence_counts = {}
+        for sentence in sentences:
+            cleaned = sentence.strip().lower()
+            if len(cleaned) > 20:  # Only check substantial sentences
+                sentence_counts[cleaned] = sentence_counts.get(cleaned, 0) + 1
+                
+        for sentence, count in sentence_counts.items():
+            if count > max_repetitions:
+                return True, f"Sentence repeated {count} times: '{sentence[:100]}...'"
+    
+    return False, ""
+
+
+async def _analyze_token_distribution(messages: List[models.MessageResponse], prompt_logprobs: List[Dict[str, Any]]) -> tuple[bool, str]:
+    """
+    Analyze the distribution of token probabilities to detect anomalous patterns.
+    
+    Returns:
+        (is_anomalous, reason)
+    """
+    if len(prompt_logprobs) < 10:  # Need sufficient tokens for analysis
+        return False, ""
+    
+    # Extract ranks and logprobs
+    ranks = []
+    logprobs = []
+    
+    for i, (message, logprob_data) in enumerate(zip(messages, prompt_logprobs)):
+        token = message.logits.text_token
+        
+        # Find the token in logprobs
+        token_found = False
+        for token_id, token_info in logprob_data.items():
+            if token_info.get("decoded_token") == token or str(token_id) == str(token):
+                ranks.append(token_info["rank"])
+                logprobs.append(token_info["logprob"])
+                token_found = True
+                break
+        
+        if not token_found:
+            ranks.append(float('inf'))  # Worst possible rank
+            logprobs.append(float('-inf'))  # Worst possible logprob
+    
+    # Check for too many high-rank (unlikely) tokens
+    high_rank_count = sum(1 for rank in ranks if rank > 100)
+    high_rank_ratio = high_rank_count / len(ranks)
+    
+    if high_rank_ratio > 0.3:  # More than 30% of tokens are very unlikely
+        return True, f"Too many unlikely tokens: {high_rank_count}/{len(ranks)} ({high_rank_ratio:.2%}) have rank > 100"
+    
+    # Check for too many very low probability tokens
+    very_low_prob_count = sum(1 for lp in logprobs if lp < -10)
+    very_low_prob_ratio = very_low_prob_count / len(logprobs)
+    
+    if very_low_prob_ratio > 0.4:  # More than 40% of tokens have very low probability
+        return True, f"Too many very low probability tokens: {very_low_prob_count}/{len(logprobs)} ({very_low_prob_ratio:.2%}) have logprob < -10"
+    
+    # Check for suspicious patterns in consecutive tokens
+    consecutive_bad_tokens = 0
+    max_consecutive_bad = 0
+    
+    for rank in ranks:
+        if rank > 50:  # Consider rank > 50 as "bad"
+            consecutive_bad_tokens += 1
+            max_consecutive_bad = max(max_consecutive_bad, consecutive_bad_tokens)
+        else:
+            consecutive_bad_tokens = 0
+    
+    if max_consecutive_bad > 20:  # Too many consecutive unlikely tokens
+        return True, f"Too many consecutive unlikely tokens: {max_consecutive_bad} tokens in a row with rank > 50"
+    
+    return False, ""
+
+
+async def _validate_tokens(
+    out_tokens: List, 
+    messages: List[models.MessageResponse], 
+    prompt_logprobs: List[Dict[str, Any]], 
+    payload: Dict, 
+    eos_token_id: int
+) -> tuple[bool, str, List[int]]:
+    """
+    Enhanced token validation with repetition detection and distribution analysis.
+    """
     failed_tokens_idx = []
     failed_tokens_details = []
-    max_acceptable_rank = 10 if payload["temperature"] <= 0.5 else int(10 / (1.03 - payload["temperature"]))
-
+    max_acceptable_rank = 5
+    
+    # First, check for repetitive patterns
+    is_repetitive, repetition_reason = await _detect_repetitive_patterns(messages)
+    if is_repetitive:
+        return True, f"Repetitive content detected: {repetition_reason}", []
+    
+    # Analyze token distribution for anomalies
+    is_anomalous, anomaly_reason = await _analyze_token_distribution(messages, prompt_logprobs)
+    if is_anomalous:
+        return True, f"Anomalous token distribution: {anomaly_reason}", []
+    
     logger.info(f"prompt_logprobs : {json.dumps(prompt_logprobs[:2], indent=2)}")
+    
+    # Original token validation logic with enhanced criteria
+    suspicious_token_count = 0
+    total_rank_penalty = 0
+    
     for idx, response_token, logprobs in zip(range(len(out_tokens)), out_tokens, prompt_logprobs):
         nice_logprobs = json.dumps(logprobs, indent=2, sort_keys=True, ensure_ascii=False)
         additional_log = f" (decoded: '{messages[idx].content}', logprob: {messages[idx].logits.logprob})" if idx <= len(messages) - 1 else ""
@@ -374,43 +513,85 @@ async def _validate_tokens(out_tokens: List, messages: List[models.MessageRespon
         if str(response_token) in logprobs:
             logprob = logprobs[str(response_token)]["logprob"]
             rank = logprobs[str(response_token)]["rank"]
-
-            if rank < max_acceptable_rank and logprob > float("-inf"):
-                pass
-            else:
-                logger.error(f"Token {response_token} {additional_log} in logprobs with bad behaviour; rank: {rank}, logprob: {logprob} ❌")
+            
+            # Enhanced criteria for token acceptance
+            is_token_acceptable = True
+            failure_reasons = []
+            
+            # Original rank and logprob checks
+            if rank >= max_acceptable_rank:
+                is_token_acceptable = False
+                failure_reasons.append(f"rank too high ({rank} >= {max_acceptable_rank})")
+                
+            if logprob <= float("-inf"):
+                is_token_acceptable = False
+                failure_reasons.append("logprob is -inf")
+            
+            # Additional checks for suspicious tokens
+            if rank > 100:  # Very unlikely token
+                suspicious_token_count += 1
+                total_rank_penalty += rank
+                
+            if rank > 1000:  # Extremely unlikely token
+                is_token_acceptable = False
+                failure_reasons.append(f"extremely unlikely token (rank {rank})")
+                
+            if logprob < -15:  # Very low probability
+                is_token_acceptable = False
+                failure_reasons.append(f"very low probability (logprob {logprob})")
+            
+            if not is_token_acceptable:
+                logger.error(f"Token {response_token} {additional_log} failed validation: {', '.join(failure_reasons)} ❌")
                 failed_tokens_idx.append(idx)
-                failed_tokens_details.append((response_token, rank, logprob, additional_log))
+                failed_tokens_details.append((response_token, rank, logprob, additional_log, failure_reasons))
 
                 if len(failed_tokens_idx) > MAX_FAILED_TOKENS:
-                    failed_tokens_details = json.dumps(failed_tokens_details, indent=2, sort_keys=True, ensure_ascii=False)
-                    fail_reason = f"Too many bad tokens found ('response_token', 'rank', 'logprob', 'additional_log'):\n{failed_tokens_details}"
+                    failed_tokens_details_str = json.dumps(failed_tokens_details, indent=2, sort_keys=True, ensure_ascii=False)
+                    fail_reason = f"Too many bad tokens found ('response_token', 'rank', 'logprob', 'additional_log', 'reasons'):\n{failed_tokens_details_str}"
                     return True, fail_reason, failed_tokens_idx
         else:
             logger.error(f"Token {response_token} {additional_log} not found in logprobs :(")
             return True, "Token not found in logprobs", failed_tokens_idx
 
+        # Enhanced EOS token handling
         if str(eos_token_id) in logprobs and str(response_token) != str(eos_token_id):
             eos_logprob = logprobs[str(eos_token_id)]["logprob"]
             response_logprob = logprobs[str(response_token)]["logprob"]
             
             if response_logprob == float("-inf"):
-                return True, "You really went out your way to avoid stopping!", failed_tokens_idx
+                return True, "Token with -inf probability chosen over EOS", failed_tokens_idx
             
             if eos_logprob > float("-inf"):
                 try:
                     if response_logprob > float("-inf"):
                         prob_ratio = math.exp(eos_logprob) / math.exp(response_logprob)
-                        if prob_ratio > 100:
-                            return True, "You really went out your way to avoid stopping!", failed_tokens_idx
+                        # More strict threshold for stopping avoidance
+                        if prob_ratio > 50:  # Reduced from 100
+                            return True, f"Avoided stopping when EOS was {prob_ratio:.2f}x more likely", failed_tokens_idx
                     else:
                         pass
 
                 except (ZeroDivisionError, OverflowError):
                     logger.warning("Math error when comparing token probabilities")
-                    return True, "You really went out your way to avoid stopping!", failed_tokens_idx
+                    return True, "Math error in probability comparison", failed_tokens_idx
+    
+    # Check overall suspicious token ratio
+    if len(messages) > 20:  # Only for longer responses
+        suspicious_ratio = suspicious_token_count / len(messages)
+        avg_rank_penalty = total_rank_penalty / len(messages) if len(messages) > 0 else 0
+        
+        if suspicious_ratio > 0.5:  # More than 50% suspicious tokens
+            return True, f"Too many suspicious tokens: {suspicious_token_count}/{len(messages)} ({suspicious_ratio:.2%}) have rank > 100", failed_tokens_idx
+            
+        if avg_rank_penalty > 200:  # Average rank penalty too high
+            return True, f"Average token rank too high: {avg_rank_penalty:.1f} (indicating poor overall quality)", failed_tokens_idx
 
     return False, "", failed_tokens_idx
+
+
+
+#----
+
 
 
 async def _perform_token_checks(task_config, payload, messages, indices_to_check):
@@ -545,8 +726,8 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
 
     indices_to_check = [0, len(messages) - 1] if len(messages) > 1 else [0]
     
-    # if failed_tokens_idx:
-    #     indices_to_check += failed_tokens_idx[:3]
+    if failed_tokens_idx:
+        indices_to_check += failed_tokens_idx[:3]
 
     remaining_indexes = list(set(range(0, len(messages) - 1)) - set(indices_to_check))
     number_of_additional_indices_to_check = min(5 - len(indices_to_check), len(messages) - 2)
