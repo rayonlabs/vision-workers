@@ -212,10 +212,6 @@ async def calculate_distance_for_token_vlm(
         logger.error(f"Request failed in calculate_distance_for_token_vlm: {e}")
         return 1
 
-    logger.info(f"chat completion payload: \n{json.dumps(chat_completions_payload, indent=2)}\n")
-    logger.info(f"validator_checking_response: \n{json.dumps(validator_checking_response, indent=2)}\n")
-    logger.info(f"chat_responses: \n{json.dumps([response.dict() for response in chat_responses[max(0, index-5):index+3]], indent=2)}\n")
-    logger.info(f"focus token in response: \n{json.dumps(chat_responses[index].dict(), indent=2)}\n")
 
     # tweaked when upgrading vllm 0.6.4.post1 to 0.8.5.post1 due to `\u0120` being present in upgraded version, https://gist.github.com/tripathiarpan20/f742eacd9f462656c10ce202bbb86dde
     # text = chat_responses[index].content
@@ -242,8 +238,6 @@ async def calculate_distance_for_token_vlm(
         return 1
     else:
         distance = min(abs(math.exp(found_entry["logprob"]) - math.exp(chat_responses[index].logits.logprob)), 1)
-        logger.info(f"token: {text} - logprob : {chat_responses[index].logits.logprob}")
-        logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
 
     return distance
 
@@ -291,10 +285,6 @@ async def calculate_distance_for_token(
         logger.error(f"Request failed in calculate_distance_for_token: {e}")
         return 1
 
-    logger.info(f"completion payload: \n{json.dumps(completions_payload, indent=2)}\n")
-    logger.info(f"validator_checking_response: \n{json.dumps(validator_checking_response, indent=2)}\n")
-    logger.info(f"chat_responses: \n{json.dumps([response.dict() for response in chat_responses[max(0, index-5):index+3]], indent=2)}\n")
-    logger.info(f"focus token in response: \n{json.dumps(chat_responses[index].dict(), indent=2)}\n")
 
     # tweaked when upgrading vllm 0.6.4.post1 to 0.8.5.post1 due to `\u0120` being present in upgraded version, https://gist.github.com/tripathiarpan20/f742eacd9f462656c10ce202bbb86dde
     #text = chat_responses[index].content
@@ -308,8 +298,6 @@ async def calculate_distance_for_token(
         return 1
     else:
         distance = min(abs(math.exp(validator_log_probs_for_token[text]) - math.exp(chat_responses[index].logits.logprob)), 1)
-        logger.info(f"token: {text} - logprob : {chat_responses[index].logits.logprob}")
-        logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
 
     return distance
 
