@@ -564,7 +564,7 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     if critical_fail:
         nice_logprobs = json.dumps(prompt_logprobs, indent=2, sort_keys=True, ensure_ascii=False)
         logger.error(f"EOT found to be suspiciously present; {failed_tokens_idx}." f" Prompt logprobs: {nice_logprobs}" f" Reason: {fail_reason}")
-        return -100.0
+        return -10.0
     elif bad_token_found:
         nice_logprobs = json.dumps(prompt_logprobs, indent=2, sort_keys=True, ensure_ascii=False)
         logger.error(f"Bad token (s) found at indexes {failed_tokens_idx}." f" Prompt logprobs: {nice_logprobs}" f" Reason: {fail_reason}")
@@ -672,7 +672,7 @@ async def check_vlm_result(result: models.QueryResult, payload: dict, task_confi
     if critical_fail:
         nice_logprobs = json.dumps(prompt_logprobs, indent=2, sort_keys=True, ensure_ascii=False)
         logger.error(f"EOT found to be suspiciously present; {failed_tokens_idx}." f" Prompt logprobs: {nice_logprobs}" f" Reason: {fail_reason}")
-        return -100.0
+        return -10.0
     elif bad_token_found:
         nice_logprobs = json.dumps(prompt_logprobs, indent=2, sort_keys=True, ensure_ascii=False)
         logger.error(f"Bad token (s) found at indexes {failed_tokens_idx}." f" Prompt logprobs: {nice_logprobs}" f" Reason: {fail_reason}")
