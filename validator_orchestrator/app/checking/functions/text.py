@@ -381,7 +381,7 @@ async def _validate_tokens(out_tokens: List, messages: List[models.MessageRespon
     temperature_scale = 0.5
     max_acceptable_rank = 10
     if temperature > 0.5:
-        temperature_scale = (temperature - 0.5)
+        temperature_scale = (temperature - 0.5) * 3
         max_acceptable_rank = int(10 + temperature_scale * 40)
     max_acceptable_eot_rank = 300 + temperature_scale * 50
 
