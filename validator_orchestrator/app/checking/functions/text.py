@@ -401,7 +401,7 @@ async def _validate_tokens(out_tokens: List, messages: List[models.MessageRespon
                 failed_tokens_idx.append(idx)
                 failed_tokens_details.append((response_token, rank, logprob, additional_log))
 
-                if int(response_token) == int(eos_token_id) and len(messages) < payload["max_tokens"] - 1:
+                if int(response_token) == int(eos_token_id) and len(messages) < payload["max_tokens"] - 1 and len(out_tokens) < payload["max_tokens"]:
                     if rank > max_acceptable_eot_rank:
                         failed_tokens_details = json.dumps(failed_tokens_details, indent=2, sort_keys=True, ensure_ascii=False)
                         fail_reason = f"EOS token found with bad rank! ('response_token', 'rank', 'logprob', 'additional_log'):\n{failed_tokens_details}"
