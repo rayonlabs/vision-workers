@@ -155,7 +155,11 @@ class PayloadModifier:
 
 
     def modify_edit_image(self, input_data: ImageEditBase) -> Dict[str, Any]:
-        payload = copy.deepcopy(self._payloads[f"{input_data.model}"])
+        if input_data.lora:
+            payload = copy.deepcopy(self._payloads[f"{input_data.model}-lora"])
+            payload["Lora"]["inputs"]["lora_name"] = f"{input_data.lora}.safetensors"
+        else:
+            payload = copy.deepcopy(self._payloads[f"{input_data.model}"])
         init_img = base64_to_image(input_data.init_image)
         init_img.save(f"{cst.COMFY_INPUT_PATH}init.png")
 

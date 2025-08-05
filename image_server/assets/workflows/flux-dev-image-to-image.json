@@ -29,7 +29,7 @@
     },
     "10": {
       "inputs": {
-        "vae_name": "ae.safetensors"
+        "vae_name": "ae.sft"
       },
       "class_type": "VAELoader",
       "_meta": {
@@ -49,7 +49,7 @@
     },
     "12": {
       "inputs": {
-        "unet_name": "flux1-dev.safetensors",
+        "unet_name": "flux1-dev.sft",
         "weight_dtype": "default"
       },
       "class_type": "UNETLoader",
