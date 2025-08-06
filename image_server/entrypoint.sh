@@ -9,9 +9,8 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 echo "Starting the image server. First i'll download all the models..."
-# tODO: remove this
-chmod +x setup.sh
-./setup.sh
+
+python setup.py
 
 vram_mode=${VRAM_MODE:-'--lowvram'}
 warmup=$(echo ${WARMUP:-false} | tr '[:upper:]' '[:lower:]')
