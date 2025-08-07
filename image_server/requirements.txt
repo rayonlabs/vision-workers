@@ -33,3 +33,8 @@ loguru==0.7.2
 comfyui-frontend-package==1.23.4
 comfyui-workflow-templates==0.1.32
 comfyui-embedded-docs==0.2.3
+aiohttp==3.12.15
+yarl==1.20.1
+spandrel==0.4.1
+av==15.0.0
+alembic==1.16.4
