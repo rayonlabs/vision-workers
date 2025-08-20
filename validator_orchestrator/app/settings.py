@@ -3,7 +3,7 @@ from enum import Enum
 
 
 class Settings(BaseSettings):
-    version: str = "1.1.8.1"
+    version: str = "1.1.8.2"
     environment: str = "prod"
     debug: bool = False
     cors_origins: list[str] = ["*"]
