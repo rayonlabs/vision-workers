@@ -24,9 +24,13 @@ jobs:
         with:
           file: Dockerfile.image_server
           push: false
+          build-args: |
+            CONDA_PLUGINS_AUTO_ACCEPT_TOS=true
 
       - name: Build orchestrator Docker image
         uses: docker/build-push-action@v6.11.0
         with:
           file: Dockerfile.orchestrator
           push: false
+          build-args: |
+            CONDA_PLUGINS_AUTO_ACCEPT_TOS=true
