@@ -11,7 +11,7 @@ jobs:
     runs-on:
       - machine
       - gpu=t4
-      - tenancy=spot
+      - tenancy=on_demand
       - cpu=4
       - ram=16
       - architecture=x64
@@ -22,6 +22,8 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - uses: crazy-max/ghaction-github-runtime@v3
+
       - name: Build orchestrator Docker image
         uses: docker/build-push-action@v6.11.0
         with:
@@ -30,15 +32,15 @@ jobs:
           build-args: |
             CONDA_PLUGINS_AUTO_ACCEPT_TOS=true
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max,ignore-error=true
 
   build-image_server:
     runs-on:
       - machine
-      - gpu=l40s
-      - tenancy=spot
+      - gpu=t4
+      - tenancy=on_demand
       - cpu=4
-      - ram=32
+      - ram=16
       - architecture=x64
     steps:
       - name: Checkout code
@@ -46,6 +48,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - uses: crazy-max/ghaction-github-runtime@v3
 
       - name: Build image_server Docker image
         uses: docker/build-push-action@v6.11.0
@@ -55,4 +59,4 @@ jobs:
           build-args: |
             CONDA_PLUGINS_AUTO_ACCEPT_TOS=true
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max,ignore-error=true
