@@ -101,15 +101,17 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
     }
     try:
         vali_nsfw_scores, is_nsfw = await query_endpoint_with_status('/check-nsfw', is_nsfw_payload, task_config.server_needed.value)
-        is_nsfw_score_consistent = validate_nsfw_consistency(
-            vali_nsfw_scores.nsfw_scores,
-            image_response_body.nsfw_scores,
-        )
-        if is_nsfw_score_consistent:
-            is_miner_image_nsfw = is_nsfw
-        else:
-            logger.error(f"NSFW scores are inconsistent: {vali_nsfw_scores.nsfw_scores} vs {image_response_body.nsfw_scores}")
-            is_miner_image_nsfw = False
+        if is_nsfw != image_response_body.is_nsfw:
+            is_nsfw_score_consistent = validate_nsfw_consistency(
+                vali_nsfw_scores.nsfw_scores,
+                image_response_body.nsfw_scores,
+            )
+            logger.info(f"NSFW scores consistency check: {is_nsfw_score_consistent}")
+            if is_nsfw_score_consistent:
+                is_miner_image_nsfw = is_nsfw
+            else:
+                logger.error(f"NSFW scores are inconsistent: {vali_nsfw_scores.nsfw_scores} vs {image_response_body.nsfw_scores}")
+                is_miner_image_nsfw = False
     except Exception as e:
         logger.error(f"Failed to query NSFW endpoint: {e}")
 

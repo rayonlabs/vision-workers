@@ -1,6 +1,6 @@
 #!/bin/bash
-ORCHESTRATOR_IMAGE="nineteenai/sn19:orchestrator-latest"
-IMAGE_SERVER_IMAGE="nineteenai/sn19:image_server-latest"
+ORCHESTRATOR_IMAGE="19valitest"
+IMAGE_SERVER_IMAGE="19imgtest"
 PORT=6920
 REFRESH_LOCAL_IMAGES=1
 
