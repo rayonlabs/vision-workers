@@ -145,30 +145,6 @@ def main():
         cache_dir="ComfyUI/models/caches",
     )
 
-    logger.info("inscene.safetensors")
-    download_file(
-        repo_id="peteromallet/Flux-Kontext-InScene",
-        filename="InScene-v1.0.safetensors",
-        local_dir="ComfyUI/models/loras/inscene.safetensors",
-        cache_dir="ComfyUI/models/caches",
-    )
-
-    logger.info("put_it_here.safetensors")
-    download_file(
-        repo_id="opocai/Put_it_here_KonText_V0.2_",
-        filename="put it here+kontext-lora.safetensors",
-        local_dir="ComfyUI/models/loras/put_it_here.safetensors",
-        cache_dir="ComfyUI/models/caches",
-    )
-
-    logger.info("jpeg_comp_fix.safetensors")
-    download_file(
-        repo_id="fofr/flux-kontext-dev-jpeg-compression-fix-lora",
-        filename="flux-kontext-dev-jpeg-compression-fix-lora.safetensors",
-        local_dir="ComfyUI/models/loras/jpeg_comp_fix.safetensors",
-        cache_dir="ComfyUI/models/caches",
-    )
-
     logger.info("Downloading negativeXL_A.safetensors")
     download_file(
         repo_id="gsdf/CounterfeitXL",
