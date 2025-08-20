@@ -1,58 +1,32 @@
 name: Build
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - '**'
 
 jobs:
   build-all:
-    runs-on: ubuntu-latest
+    runs-on:
+      - machine
+      - gpu=l40s
+      - tenancy=spot
+      - cpu=4
+      - ram=32
+      - architecture=x64
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
-      - name: Read cicd config file
-        id: read_config
-        run: |
-          chmod +x ./runner-fetch-config.sh
-          ./runner-fetch-config.sh
 
-      - name: Setup SSH keys
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
-        run: |
-          mkdir -p /home/runner/.ssh
-          echo "$SSH_PRIVATE_KEY" > /home/runner/.ssh/google_compute_engine
-          echo "$SSH_PUBLIC_KEY" > /home/runner/.ssh/google_compute_engine.pub
-          chmod 600 /home/runner/.ssh/google_compute_engine
-          chmod 644 /home/runner/.ssh/google_compute_engine.pub
-
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v0.3.0
+      - name: Build image_server Docker image
+        uses: docker/build-push-action@v6.11.0
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
-      
-      - name: Wait for Instance to be Ready
-        run: |
-          until gcloud compute ssh ${{ env.GCP_GPU_NAME }} --zone ${{ env.GCP_GPU_ZONE }} --command "echo 'Instance is up'"; do
-            echo 'Waiting for the instance to be ready...'
-            sleep 10
-          done
-          echo 'Instance is ready!'
+          file: Dockerfile.image_server
+          push: false
 
-      - name: Clear remote directory
-        run: gcloud compute ssh ${{ env.GCP_GPU_NAME }} --zone ${{ env.GCP_GPU_ZONE }} --command "rm -rf /home/runner/*"
-
-      - name: Copy updated repository to remote server
-        run: gcloud compute scp --recurse /home/runner/work/tau-workers/tau-workers ${{ env.GCP_GPU_NAME }}:/home/runner/tau-workers --zone ${{ env.GCP_GPU_ZONE }}
-      
-      - name: Run script on remote server
-        run: gcloud compute ssh ${{ env.GCP_GPU_NAME }} --zone ${{ env.GCP_GPU_ZONE }} --command "export BUILD_ID=${{ github.run_id }}; docker login --username=${{ secrets.DOCKER_USER }} --password=${{ secrets.DOCKER_PASSW }}; cd /home/runner/tau-workers && chmod +x ./build-docker-ci-remote.sh && bash ./build-docker-ci-remote.sh"
-        env:
-          BUILD_ID: ${{ github.run_id }}
-          DOCKER_USER: ${{ secrets.DOCKER_USER }}
-          DOCKER_PASSW: ${{ secrets.DOCKER_PASSW }}
+      - name: Build orchestrator Docker image
+        uses: docker/build-push-action@v6.11.0
+        with:
+          file: Dockerfile.orchestrator
+          push: false
