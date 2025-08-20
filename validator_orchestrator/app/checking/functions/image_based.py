@@ -40,7 +40,7 @@ async def _get_image_similarity(
         return -10
 
     # MODEL has a very low threshold
-    score = float(probability_same_image_xg**0.5) * 0.4 + (clip_embedding_similiarity**2) * 0.6
+    score = float(probability_same_image_xg**0.5) * 0.4 + (abs(clip_embedding_similiarity)) * 0.6
     if score > 0.95:
         return 1
 
