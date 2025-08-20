@@ -21,41 +21,39 @@ def forward_inspect(self, clip_input, images):
     pooled_output = self.vision_model(clip_input)[1]
     image_embeds = self.visual_projection(pooled_output)
 
-    special_cos_dist = cosine_distance(image_embeds, self.special_care_embeds).cpu().numpy()
-    cos_dist = cosine_distance(image_embeds, self.concept_embeds).cpu().numpy()
+    special_cos = cosine_distance(image_embeds, self.special_care_embeds).cpu().numpy()
+    concept_cos = cosine_distance(image_embeds, self.concept_embeds).cpu().numpy()
 
+    special_thr = self.special_care_embeds_weights.detach().cpu().numpy()
+    concept_thr = self.concept_embeds_weights.detach().cpu().numpy()
+
+    adjustment = -0.015
+
+    raw_scores = []
     matches = {"nsfw": [], "special": []}
+
     batch_size = image_embeds.shape[0]
     for i in range(batch_size):
         result_img = {
-            "special_scores": {},
-            "special_care": [],
-            "concept_scores": {},
-            "bad_concepts": [],
+            "special_scores": special_cos[i].tolist(),
+            "concept_scores": concept_cos[i].tolist(),
         }
+        raw_scores.append(result_img)
 
-        adjustment = -0.015
+        for idx, sim in enumerate(special_cos[i]):
+            score = sim - special_thr[idx] + adjustment
+            if score > 0:
+                matches["special"].append((idx, round(float(score), 3)))
 
-        for concet_idx in range(len(special_cos_dist[0])):
-            concept_cos = special_cos_dist[i][concet_idx]
-            concept_threshold = self.special_care_embeds_weights[concet_idx].item()
-            result_img["special_scores"][concet_idx] = round(concept_cos - concept_threshold + adjustment, 3)
-            if result_img["special_scores"][concet_idx] > 0:
-                result_img["special_care"].append({concet_idx, result_img["special_scores"][concet_idx]})
-                matches["special"].append(cst.SPECIAL_CONCEPTS[concet_idx])
-
-        for concet_idx in range(len(cos_dist[0])):
-            concept_cos = cos_dist[i][concet_idx]
-            concept_threshold = self.concept_embeds_weights[concet_idx].item()
-            result_img["concept_scores"][concet_idx] = round(concept_cos - concept_threshold + adjustment, 3)
-
-            if result_img["concept_scores"][concet_idx] > 0:
-                result_img["bad_concepts"].append(concet_idx)
-                matches["nsfw"].append(cst.NSFW_CONCEPTS[concet_idx])
+        for idx, sim in enumerate(concept_cos[i]):
+            score = sim - concept_thr[idx] + adjustment
+            if score > 0:
+                matches["nsfw"].append((idx, round(float(score), 3)))
 
     has_nsfw_concepts = len(matches["nsfw"]) > 0
 
-    return matches, has_nsfw_concepts
+    return raw_scores, has_nsfw_concepts
+
 
 
 class Safety_Checker:
@@ -91,11 +89,11 @@ class Safety_Checker:
             Safety_Checker._initialized = True
             print("Safety Checker model loaded successfully!")
 
-    def nsfw_check(self, image: Image.Image) -> Tuple[Image.Image, bool]:
+    def get_nsfw_scores(self, image: Image.Image) -> Tuple[Image.Image, bool]:
         image_np = np.array(image)
         if np.all(image_np == 0):
             return True
         with torch.cuda.amp.autocast():
             safety_checker_input = self.safety_feature_extractor(images=image, return_tensors="pt").to(self.device)
-            result, has_nsfw_concepts = self.safety_checker.forward(clip_input=safety_checker_input.pixel_values, images=image)
-        return bool(has_nsfw_concepts)
+            scores, is_nsfw = self.safety_checker.forward(clip_input=safety_checker_input.pixel_values, images=image)
+        return scores, is_nsfw

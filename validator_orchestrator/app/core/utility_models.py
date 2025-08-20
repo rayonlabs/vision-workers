@@ -34,6 +34,7 @@ class ImageHashes(BaseModel):
 class ImageResponseBody(BaseModel):
     image_b64: Optional[str] = None
     is_nsfw: Optional[bool] = None
+    nsfw_scores: Optional[dict] = None
     clip_embeddings: Optional[List[float]] = None
     image_hashes: Optional[ImageHashes] = None
 

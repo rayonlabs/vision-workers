@@ -150,6 +150,7 @@ class ImageHashes(BaseModel):
 
 class ImageResponseBody(BaseModel):
     image_b64: Optional[str] = None
+    nsfw_scores: Optional[dict] = None
     is_nsfw: Optional[bool] = None
     clip_embeddings: Optional[List[float]] = None
     image_hashes: Optional[ImageHashes] = None
@@ -172,4 +173,5 @@ class CheckNSFWBase(BaseModel):
 
 
 class CheckNSFWResponse(BaseModel):
+    nsfw_scores: dict
     is_nsfw: bool

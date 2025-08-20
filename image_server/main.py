@@ -118,8 +118,8 @@ async def check_nsfw(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid image data: {str(e)}")
 
-    is_nsfw = safety_checker.nsfw_check(image)
-    return base_model.CheckNSFWResponse(is_nsfw=is_nsfw)
+    nsfw_scores, is_nsfw = safety_checker.get_nsfw_scores(image)
+    return base_model.CheckNSFWResponse(nsfw_scores=nsfw_scores, is_nsfw=is_nsfw)
 
 
 if __name__ == "__main__":
