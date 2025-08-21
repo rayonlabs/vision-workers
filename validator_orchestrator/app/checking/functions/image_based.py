@@ -6,19 +6,13 @@ from app.checking import utils as checking_utils
 import numpy as np
 import xgboost as xgb
 from loguru import logger
+import traceback
 
 from app.core.constants import AI_SERVER_PORT
 
 images_are_same_classifier = xgb.XGBClassifier()
 images_are_same_classifier.load_model("image_similarity_xgb_model.json")
 
-def validate_nsfw_consistency(miner_scores, validator_scores, rel_tolerance=1e-4, abs_tolerance=1e-3):
-    return np.allclose(
-        miner_scores,
-        validator_scores,
-        rtol=rel_tolerance,
-        atol=abs_tolerance
-    )
 
 async def _get_image_similarity(
     image_response_body: utility_models.ImageResponseBody,
@@ -95,31 +89,34 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
         return 0
 
     expected_image_response, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload, task_config.server_needed.value)
-
+    is_miner_image_nsfw = False
     is_nsfw_payload = {
         "image": image_response_body.image_b64
     }
     try:
-        vali_nsfw_scores, is_nsfw = await query_endpoint_with_status('/check-nsfw', is_nsfw_payload, task_config.server_needed.value)
-        if is_nsfw != image_response_body.is_nsfw:
-            is_nsfw_score_consistent = validate_nsfw_consistency(
+        vali_nsfw_scores = await query_endpoint_with_status('/check-nsfw', is_nsfw_payload, task_config.server_needed.value)
+        vali_nsfw_scores = utility_models.ImageResponseBody(**vali_nsfw_scores[0].dict())
+        if vali_nsfw_scores.is_nsfw != image_response_body.is_nsfw:
+            logger.info(f"vali nsfw scores: {vali_nsfw_scores.nsfw_scores} - miner nsfw scores: {image_response_body.nsfw_scores}")
+            is_nsfw_score_consistent = checking_utils.validate_nsfw_consistency(
                 vali_nsfw_scores.nsfw_scores,
                 image_response_body.nsfw_scores,
             )
             logger.info(f"NSFW scores consistency check: {is_nsfw_score_consistent}")
             if is_nsfw_score_consistent:
-                is_miner_image_nsfw = is_nsfw
+                is_miner_image_nsfw = vali_nsfw_scores.is_nsfw
             else:
                 logger.error(f"NSFW scores are inconsistent: {vali_nsfw_scores.nsfw_scores} vs {image_response_body.nsfw_scores}")
                 is_miner_image_nsfw = False
     except Exception as e:
-        logger.error(f"Failed to query NSFW endpoint: {e}")
+        traceback.print_exc()
+        logger.error(f"Failed to query NSFW endpoint: {e}", exc_info=True)
 
     if expected_image_response.clip_embeddings is None:
         logger.error(f"For some reason Everything is none! {expected_image_response}")
         return None
 
-    if is_miner_image_nsfw and is_miner_image_nsfw != image_response_body.is_nsfw:
+    if is_miner_image_nsfw:
         return -2
 
     else:

@@ -10,8 +10,8 @@ trap cleanup SIGINT SIGTERM
 
 echo "Starting the image server. First i'll download all the models..."
 # tODO: remove this
-chmod +x setup.sh
-./setup.sh
+# chmod +x setup.sh
+# ./setup.sh
 
 vram_mode=${VRAM_MODE:-'--lowvram'}
 warmup=$(echo ${WARMUP:-false} | tr '[:upper:]' '[:lower:]')
