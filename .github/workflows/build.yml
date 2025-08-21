@@ -31,8 +31,8 @@ jobs:
           push: false
           build-args: |
             CONDA_PLUGINS_AUTO_ACCEPT_TOS=true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max,ignore-error=true
+          cache-from: type=gha,scope=${{ github.ref_name }}-orchestrator
+          cache-to:   type=gha,mode=max,ignore-error=true,scope=${{ github.ref_name }}-orchestrator
 
   build-image_server:
     runs-on:
@@ -58,5 +58,5 @@ jobs:
           push: false
           build-args: |
             CONDA_PLUGINS_AUTO_ACCEPT_TOS=true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max,ignore-error=true
+          cache-from: type=gha,scope=${{ github.ref_name }}-image_server
+          cache-to:   type=gha,mode=max,ignore-error=true,scope=${{ github.ref_name }}-image_server
