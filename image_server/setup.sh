@@ -111,12 +111,12 @@ download_file "ComfyUI/models/clip/clip_l.safetensors" \
               "https://huggingface.co/comfyanonymous/flux_text_encoders/" \
               "clip_l.safetensors"
 
-download_file "ComfyUI/models/vae/ae.sft" \
+download_file "ComfyUI/models/vae/ae.safetensors" \
               "https://huggingface.co/tripathiarpan20/FLUX.1-schnell/resolve/main/ae.safetensors" \
               "https://huggingface.co/tripathiarpan20/FLUX.1-schnell/" \
               "ae.safetensors"
 
-download_file "ComfyUI/models/unet/flux1-schnell.sft" \
+download_file "ComfyUI/models/unet/flux1-schnell.safetensors" \
               "https://huggingface.co/tripathiarpan20/FLUX.1-schnell/resolve/main/flux1-schnell.safetensors" \
               "https://huggingface.co/tripathiarpan20/FLUX.1-schnell/" \
               "flux1-schnell.safetensors"
