@@ -253,61 +253,102 @@ async def calculate_distance_for_token(
     chat_responses: List[models.MessageResponse],
     index: int,
     starting_assistant_message: bool,
+    is_last_token: bool = False,
+    must_output_eos: bool = False
 ) -> float:
     model_name = task_config.load_model_config["model"]
-    eos_token_id = task_config.load_model_config["eos_token_id"]
     
     if isinstance(llm_request, models.ChatRequestModel):
-        messages = [elm.model_dump() for elm in llm_request.messages]
-        prompt, _ = await _chat_to_prompt(
-            messages=messages,
-            model_name=model_name,
-            eos_token_id=eos_token_id,
-            add_generation_prompt=starting_assistant_message,
-        )
-        if 'deepseek-r1' in model_name.lower():
-            prompt = await _process_think_tags_deepseek(prompt, messages)
-            
+        messages = llm_request.messages
+        messages = [msg.model_dump() if hasattr(msg, 'model_dump') else msg for msg in messages]
+
+        chat_completions_payload = {
+            "messages": messages,
+            "model": model_name,
+            "temperature": llm_request.temperature,
+            "top_p": 1,
+            "max_tokens": 1,
+            "logprobs": True,
+            "top_logprobs": 20,
+            "add_generation_prompt": starting_assistant_message,
+            "continue_final_message": not starting_assistant_message,
+            "add_special_tokens": False
+        }
+        
+        try:
+            validator_checking_response = await make_api_call(chat_completions_payload, endpoint=f"{BASE_URL}/v1/chat/completions")
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding JSON in calculate_distance_for_token (chat): {e}. Response: {validator_checking_response}")
+            return 1
+        except httpx.RequestError as e:
+            logger.error(f"Request failed in calculate_distance_for_token (chat): {e}")
+            return 1
+
+        logger.info(f"chat completion payload: \n{json.dumps(chat_completions_payload, indent=2)}\n")
+        logger.info(f"validator_checking_response: \n{json.dumps(validator_checking_response, indent=2)}\n")
+        
+        validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["content"][0]["top_logprobs"]
+        
     elif isinstance(llm_request, models.CompletionRequestModel):
         prompt = llm_request.prompt
 
-    completions_payload = {
-        "prompt": prompt,
-        "model": model_name,
-        "temperature": llm_request.temperature,
-        "top_p": llm_request.top_p,
-        "top_k": -1,
-        "max_tokens": 1,
-        "logprobs": DEFAULT_NUM_LOGPROBS,
-        "add_special_tokens": False
-    }
-    
-    try:
-        validator_checking_response = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
-    except json.JSONDecodeError as e:
-        logger.error(f"Error decoding JSON in calculate_distance_for_token: {e}. Response: {validator_checking_response}")
-        return 1
-    except httpx.RequestError as e:
-        logger.error(f"Request failed in calculate_distance_for_token: {e}")
-        return 1
+        completions_payload = {
+            "prompt": prompt,
+            "model": model_name,
+            "temperature": llm_request.temperature,
+            "top_p": llm_request.top_p,
+            "top_k": -1,
+            "max_tokens": 1,
+            "logprobs": DEFAULT_NUM_LOGPROBS,
+            "add_special_tokens": False
+        }
+        
+        try:
+            validator_checking_response = await make_api_call(completions_payload, endpoint=f"{BASE_URL}/v1/completions")
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding JSON in calculate_distance_for_token (completions): {e}. Response: {validator_checking_response}")
+            return 1
+        except httpx.RequestError as e:
+            logger.error(f"Request failed in calculate_distance_for_token (completions): {e}")
+            return 1
 
-    logger.info(f"completion payload: \n{json.dumps(completions_payload, indent=2)}\n")
-    logger.info(f"validator_checking_response: \n{json.dumps(validator_checking_response, indent=2)}\n")
+        logger.info(f"completion payload: \n{json.dumps(completions_payload, indent=2)}\n")
+        logger.info(f"validator_checking_response: \n{json.dumps(validator_checking_response, indent=2)}\n")
+        
+        completions_logprobs = validator_checking_response["choices"][0]["logprobs"]["top_logprobs"][0]
+        validator_log_probs_for_token = [
+            {"token": token, "logprob": logprob} 
+            for token, logprob in completions_logprobs.items()
+        ]
+
     logger.info(f"chat_responses: \n{json.dumps([response.dict() for response in chat_responses[max(0, index-5):index+3]], indent=2)}\n")
     logger.info(f"focus token in response: \n{json.dumps(chat_responses[index].dict(), indent=2)}\n")
 
-    # tweaked when upgrading vllm 0.6.4.post1 to 0.8.5.post1 due to `\u0120` being present in upgraded version, https://gist.github.com/tripathiarpan20/f742eacd9f462656c10ce202bbb86dde
-    #text = chat_responses[index].content
     text = chat_responses[index].logits.text_token
+    found_entry = next((entry for entry in validator_log_probs_for_token if entry["token"] == text), None)
 
-    validator_log_probs_for_token = validator_checking_response["choices"][0]["logprobs"]["top_logprobs"][0]
+    # case of prompt_logprobs outputting |eot| token but miner response including "" output
+    if is_last_token and must_output_eos:
+        if chat_responses[index].content != "":
+            logger.info(f"token: `{text}` at last index doesn't correspond to eos \"\" output by miners")
+            logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
+            return 1
+        
+        if isinstance(llm_request, models.ChatRequestModel):
+            eos_token = validator_checking_response["choices"][0]["logprobs"]["content"][0]["token"]
+        else:
+            # in case of completions, we need to find the EOS token in the response
+            eos_token_id = task_config.load_model_config["eos_token_id"]
+            eos_token = await _detokenize([eos_token_id], model_name)
+            
+        found_entry = next((entry for entry in validator_log_probs_for_token if entry["token"] == eos_token), None)
 
-    if text not in validator_log_probs_for_token:
-        logger.info(f"token: {chat_responses[index].content} (parsed as {text}) - not found in vali logprobs")
+    if not found_entry:
+        logger.info(f"token: {text} - not found in vali logprobs")
         logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
         return 1
     else:
-        distance = min(abs(math.exp(validator_log_probs_for_token[text]) - math.exp(chat_responses[index].logits.logprob)), 1)
+        distance = min(abs(math.exp(found_entry["logprob"]) - math.exp(chat_responses[index].logits.logprob)), 1)
         logger.info(f"token: {text} - logprob : {chat_responses[index].logits.logprob}")
         logger.info(f"validator_log_probs_for_token: {validator_log_probs_for_token}")
 
@@ -361,7 +402,7 @@ async def _get_full_prompt(is_completions_payload, payload, messages, task_confi
         )
         full_prompt_before_eos = input_content + full_response_content
         
-        if 'deepseek-r1' in model_name.lower():
+        if 'deepseek-r1' in model_name.lower() or 'nemo' in model_name.lower():
             all_tokens = await _tokenize(full_prompt_before_eos, model_name, add_special_tokens=False)
         else:    
             all_tokens = await _tokenize(full_prompt_before_eos, model_name, add_special_tokens=True)
@@ -563,11 +604,9 @@ async def check_text_result(result: models.QueryResult, payload: dict, task_conf
     
     if critical_fail:
         nice_logprobs = json.dumps(prompt_logprobs, indent=2, sort_keys=True, ensure_ascii=False)
-        logger.error(f"EOT found to be suspiciously present; {failed_tokens_idx}." f" Prompt logprobs: {nice_logprobs}" f" Reason: {fail_reason}")
         return -10.0
     elif bad_token_found:
         nice_logprobs = json.dumps(prompt_logprobs, indent=2, sort_keys=True, ensure_ascii=False)
-        logger.error(f"Bad token (s) found at indexes {failed_tokens_idx}." f" Prompt logprobs: {nice_logprobs}" f" Reason: {fail_reason}")
         return 0.0
 
     logger.info("All tokens found in prompt_logprobs! ✅")
