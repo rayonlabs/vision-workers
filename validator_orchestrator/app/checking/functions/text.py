@@ -361,7 +361,7 @@ async def _get_full_prompt(is_completions_payload, payload, messages, task_confi
         )
         full_prompt_before_eos = input_content + full_response_content
         
-        if 'deepseek-r1' in model_name.lower():
+        if 'deepseek-r1' in model_name.lower() or 'nemo' in model_name.lower():
             all_tokens = await _tokenize(full_prompt_before_eos, model_name, add_special_tokens=False)
         else:    
             all_tokens = await _tokenize(full_prompt_before_eos, model_name, add_special_tokens=True)
