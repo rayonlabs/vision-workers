@@ -6,7 +6,6 @@ from app.checking import utils as checking_utils
 import numpy as np
 import xgboost as xgb
 from loguru import logger
-import traceback
 
 from app.core.constants import AI_SERVER_PORT
 
@@ -107,9 +106,8 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
                 is_miner_image_nsfw = vali_nsfw_scores.is_nsfw
             else:
                 logger.error(f"NSFW scores are inconsistent: {vali_nsfw_scores.nsfw_scores} vs {image_response_body.nsfw_scores}")
-                is_miner_image_nsfw = False
+                is_miner_image_nsfw = True
     except Exception as e:
-        traceback.print_exc()
         logger.error(f"Failed to query NSFW endpoint: {e}", exc_info=True)
 
     if expected_image_response.clip_embeddings is None:
