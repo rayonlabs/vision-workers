@@ -3,6 +3,7 @@ FROM nvidia/cuda:11.8.0-devel-ubuntu20.04
 WORKDIR /app
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV CONDA_PLUGINS_AUTO_ACCEPT_TOS=true
 
 # PM2
 RUN apt-get update && apt-get install -y curl \
