@@ -25,24 +25,18 @@ def image_hash_feature_extraction(image: Image.Image) -> base_model.ImageHashes:
 async def take_image_and_return_formatted_response_body(
     image: Image.Image,
 ) -> base_model.ImageResponseBody:
-    is_nsfw = safety_checker.nsfw_check(image)
+    nsfw_scores, is_nsfw = safety_checker.get_nsfw_scores(image)
     image_b64 = base64_utils.pil_to_base64(image)
     image_hashes = image_hash_feature_extraction(image)
     clip_embeddings_of_images = await inference.get_clip_embeddings(base_model.ClipEmbeddingsBase(image_b64s=[image_b64]))
     # Since we only need the first element of the list
     clip_embeddings_of_image = clip_embeddings_of_images[0]
 
-    if is_nsfw:
-        return base_model.ImageResponseBody(
+    return base_model.ImageResponseBody(
             image_b64=image_b64,
             image_hashes=image_hashes,
             clip_embeddings=clip_embeddings_of_image,
             is_nsfw=is_nsfw,
+            nsfw_scores=nsfw_scores,
         )
-    else:
-        return base_model.ImageResponseBody(
-            image_b64=image_b64,
-            image_hashes=image_hashes,
-            clip_embeddings=clip_embeddings_of_image,
-            is_nsfw=is_nsfw,
-        )
+        

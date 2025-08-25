@@ -3,6 +3,7 @@ from typing import Dict, Any, Union, Tuple
 import httpx
 from app.core import utility_models
 from app.checking import utils as checking_utils
+import numpy as np
 import xgboost as xgb
 from loguru import logger
 
@@ -87,24 +88,40 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
         return 0
 
     expected_image_response, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload, task_config.server_needed.value)
-
     is_nsfw_payload = {
         "image": image_response_body.image_b64
     }
+    is_nsfw_score_consistent = None
     try:
-        is_miner_image_nsfw, _ = await query_endpoint_with_status('/check-nsfw', is_nsfw_payload, task_config.server_needed.value)
-        is_miner_image_nsfw = is_miner_image_nsfw.is_nsfw
+        vali_nsfw_scores = await query_endpoint_with_status('/check-nsfw', is_nsfw_payload, task_config.server_needed.value)
+        vali_nsfw_scores = utility_models.ImageResponseBody(**vali_nsfw_scores[0].dict())
+        if vali_nsfw_scores.is_nsfw != image_response_body.is_nsfw:
+            logger.info(f"vali nsfw scores: {vali_nsfw_scores.nsfw_scores} - miner nsfw scores: {image_response_body.nsfw_scores}")
+            is_nsfw_score_consistent = checking_utils.validate_nsfw_consistency(
+                vali_nsfw_scores.nsfw_scores,
+                image_response_body.nsfw_scores,
+            )
+            logger.info(f"NSFW scores consistency check: {is_nsfw_score_consistent}")
+            if not is_nsfw_score_consistent:
+                logger.error(f"NSFW scores are inconsistent: {vali_nsfw_scores.nsfw_scores} vs {image_response_body.nsfw_scores}")
+
     except Exception as e:
-        logger.error(f"Failed to query NSFW endpoint: {e}")
+        logger.error(f"Failed to query NSFW endpoint: {e}", exc_info=True)
 
     if expected_image_response.clip_embeddings is None:
         logger.error(f"For some reason Everything is none! {expected_image_response}")
         return None
 
-    if is_miner_image_nsfw and is_miner_image_nsfw != image_response_body.is_nsfw:
+    logger.info(f"Validator is_nsfw: {vali_nsfw_scores.is_nsfw}, Miner image response is_nsfw: {image_response_body.is_nsfw}")
+    logger.info(f"NSFW Scores Consistency: {is_nsfw_score_consistent}")
+
+
+    if vali_nsfw_scores.is_nsfw != image_response_body.is_nsfw and not is_nsfw_score_consistent:
+        logger.info("Assigning score of -2.")
         return -2
 
     else:
+        logger.info("NSFW Check Passed")
         return await _get_image_similarity(
             image_response_body,
             expected_image_response,

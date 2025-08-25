@@ -10,6 +10,7 @@ import io
 import base64
 
 
+
 def _hash_distance(hash_1: str, hash_2: str, color_hash: bool = False) -> int:
     if color_hash:
         restored_hash1 = imagehash.hex_to_flathash(hash_1, hashsize=3)
@@ -84,3 +85,22 @@ async def fetch_image_as_bytes(url):
     except Exception as e:
         logger.debug(f"Error when fetching image {url}: {e}")
         return False
+
+
+def validate_nsfw_consistency(miner_scores, validator_scores, rtol=5e-2, atol=2e-2):
+    """Validate consistency between miner and validator scores for NSFW content."""
+    for section in ("special_scores", "concept_scores"):
+        m_dict = miner_scores.get(section, {})
+        v_dict = validator_scores.get(section, {})
+        
+        shared_keys = set(m_dict.keys()) & set(v_dict.keys())
+        if not shared_keys:
+            continue
+            
+        m_values = [float(m_dict[k]) for k in shared_keys]
+        v_values = [float(v_dict[k]) for k in shared_keys]
+
+        if not np.allclose(m_values, v_values, rtol=rtol, atol=atol, equal_nan=True):
+            return False
+    
+    return True
