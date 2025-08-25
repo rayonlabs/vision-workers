@@ -91,6 +91,7 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
     is_nsfw_payload = {
         "image": image_response_body.image_b64
     }
+    is_nsfw_score_consistent = None
     try:
         vali_nsfw_scores = await query_endpoint_with_status('/check-nsfw', is_nsfw_payload, task_config.server_needed.value)
         vali_nsfw_scores = utility_models.ImageResponseBody(**vali_nsfw_scores[0].dict())
