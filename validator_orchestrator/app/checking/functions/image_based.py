@@ -111,10 +111,16 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
         logger.error(f"For some reason Everything is none! {expected_image_response}")
         return None
 
+    logger.info(f"Validator is_nsfw: {vali_nsfw_scores.is_nsfw}, Miner image response is_nsfw: {image_response_body.is_nsfw}")
+    logger.info(f"NSFW Scores Consistency: {is_nsfw_score_consistent}")
+
+
     if vali_nsfw_scores.is_nsfw != image_response_body.is_nsfw and not is_nsfw_score_consistent:
+        logger.info("Assigning score of -2.")
         return -2
 
     else:
+        logger.info("NSFW Check Passed")
         return await _get_image_similarity(
             image_response_body,
             expected_image_response,
