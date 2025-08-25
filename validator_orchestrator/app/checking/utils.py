@@ -87,25 +87,20 @@ async def fetch_image_as_bytes(url):
         return False
 
 
-def _sorted_key_fn(k):
-    s = str(k)
-    return (0, int(s)) if s.isdigit() else (1, s)
-
-
-def _to_array_aligned(miner_dict: dict, validator_dict: dict):
-    shared = sorted(set(miner_dict.keys()) & set(validator_dict.keys()), key=_sorted_key_fn)
-    m_arr = np.array([float(miner_dict[k]) for k in shared], dtype=float)
-    v_arr = np.array([float(validator_dict[k]) for k in shared], dtype=float)
-    return m_arr, v_arr
-
-
 def validate_nsfw_consistency(miner_scores, validator_scores, rtol=5e-2, atol=2e-2):
+    """Validate consistency between miner and validator scores for NSFW content."""
     for section in ("special_scores", "concept_scores"):
-        m_dict = miner_scores.get(section, {}) or {}
-        v_dict = validator_scores.get(section, {}) or {}
-        m_arr, v_arr = _to_array_aligned(m_dict, v_dict)
+        m_dict = miner_scores.get(section, {})
+        v_dict = validator_scores.get(section, {})
+        
+        shared_keys = set(m_dict.keys()) & set(v_dict.keys())
+        if not shared_keys:
+            continue
+            
+        m_values = [float(m_dict[k]) for k in shared_keys]
+        v_values = [float(v_dict[k]) for k in shared_keys]
 
-        if m_arr.size and v_arr.size:
-            if not np.allclose(m_arr, v_arr, rtol=rtol, atol=atol, equal_nan=True):
-                return False
+        if not np.allclose(m_values, v_values, rtol=rtol, atol=atol, equal_nan=True):
+            return False
+    
     return True

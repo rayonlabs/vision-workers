@@ -88,7 +88,6 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
         return 0
 
     expected_image_response, vali_status_code = await query_endpoint_with_status(task_config.endpoint, payload, task_config.server_needed.value)
-    is_miner_image_nsfw = False
     is_nsfw_payload = {
         "image": image_response_body.image_b64
     }
@@ -102,11 +101,9 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
                 image_response_body.nsfw_scores,
             )
             logger.info(f"NSFW scores consistency check: {is_nsfw_score_consistent}")
-            if is_nsfw_score_consistent:
-                is_miner_image_nsfw = vali_nsfw_scores.is_nsfw
-            else:
+            if not is_nsfw_score_consistent:
                 logger.error(f"NSFW scores are inconsistent: {vali_nsfw_scores.nsfw_scores} vs {image_response_body.nsfw_scores}")
-                is_miner_image_nsfw = True
+
     except Exception as e:
         logger.error(f"Failed to query NSFW endpoint: {e}", exc_info=True)
 
@@ -114,7 +111,7 @@ async def check_image_result(result: models.QueryResult, payload: dict, task_con
         logger.error(f"For some reason Everything is none! {expected_image_response}")
         return None
 
-    if is_miner_image_nsfw:
+    if vali_nsfw_scores.is_nsfw != image_response_body.is_nsfw and not is_nsfw_score_consistent:
         return -2
 
     else:

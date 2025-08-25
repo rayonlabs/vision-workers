@@ -39,7 +39,7 @@ def forward_inspect(self, clip_input, images):
         for concet_idx in range(len(special_cos_dist[0])):
             concept_cos = special_cos_dist[i][concet_idx]
             concept_threshold = self.special_care_embeds_weights[concet_idx].item()
-            result_img["special_scores"][concet_idx] = round(concept_cos - concept_threshold + adjustment, 3)
+            result_img["special_scores"][concet_idx] = concept_cos - concept_threshold + adjustment
             if result_img["special_scores"][concet_idx] > 0:
                 result_img["special_care"].append({concet_idx, result_img["special_scores"][concet_idx]})
                 matches["special"].append(cst.SPECIAL_CONCEPTS[concet_idx])
@@ -47,7 +47,7 @@ def forward_inspect(self, clip_input, images):
         for concet_idx in range(len(cos_dist[0])):
             concept_cos = cos_dist[i][concet_idx]
             concept_threshold = self.concept_embeds_weights[concet_idx].item()
-            result_img["concept_scores"][concet_idx] = round(concept_cos - concept_threshold + adjustment, 3)
+            result_img["concept_scores"][concet_idx] = concept_cos - concept_threshold + adjustment
 
             if result_img["concept_scores"][concet_idx] > 0:
                 result_img["bad_concepts"].append(concet_idx)
@@ -99,4 +99,4 @@ class Safety_Checker:
         with torch.cuda.amp.autocast():
             safety_checker_input = self.safety_feature_extractor(images=image, return_tensors="pt").to(self.device)
             scores, is_nsfw = self.safety_checker.forward(clip_input=safety_checker_input.pixel_values, images=image)
-        return scores, is_nsfw
+        return scores, bool(is_nsfw)
